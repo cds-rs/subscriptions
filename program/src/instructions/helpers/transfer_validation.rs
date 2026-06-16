@@ -61,13 +61,10 @@ pub fn validate_recurring_transfer(
         return Err(SubscriptionsError::InvalidPeriodLength.into());
     }
 
-    // AUDIT FINDING 3.1.1 (Cantina, High): the start-time guard is removed here to
-    // re-introduce the vulnerability on this dsl-audit branch. The fix (PR6) was:
-    //   if current_ts < *current_period_start_ts {
-    //       return Err(SubscriptionsError::DelegationNotStarted.into());
-    //   }
-    // Without it, `saturating_sub` floors a pre-start timestamp to 0, so the full
-    // per-period budget is pullable before the delegation period begins.
+    if current_ts < *current_period_start_ts {
+        return Err(SubscriptionsError::DelegationNotStarted.into());
+    }
+
     let time_since_start = current_ts.saturating_sub(*current_period_start_ts);
 
     if time_since_start >= period_length {
