@@ -14,6 +14,8 @@ pub mod tests {
 #[cfg(test)]
 mod audit_regression_3_1_1;
 #[cfg(test)]
+mod behavior_transfer_subscription_alt;
+#[cfg(test)]
 mod audit_regression_3_1_3;
 #[cfg(test)]
 mod audit_regression_ghost_plan;
