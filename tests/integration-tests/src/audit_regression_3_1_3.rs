@@ -2,7 +2,7 @@
 //!
 //! "Attacker can permanently block PDA creation by over-funding the address."
 //! On this `dsl-audit` branch the PR5 fix is reverted, so account creation is an
-//! unconditional `CreateAccount`. An attacker pre-funds the authority PDA with
+//! unconditional `CreateAccount`. Mallory pre-funds the authority PDA with
 //! lamports; the System program then rejects the create, and the legitimate user
 //! can never initialize their authority. On the fixed code the program tops up
 //! the rent and `Allocate`/`Assign`s in place, so creation succeeds and this test
@@ -46,7 +46,7 @@ fn finding_3_1_3_prefunded_pda_blocks_creation() {
     world.md().note(
         "Finding 3.1.3: the PDA address was pre-funded, so the unconditional CreateAccount on this branch \
          is rejected by the System program and Alice's authority cannot be created — a permanent denial of \
-         service against any user whose (deterministic) PDA an attacker front-runs. On the fixed code (PR5) \
+         service against any user whose (deterministic) PDA Mallory front-runs. On the fixed code (PR5) \
          the program tops up the rent and Allocate/Assign-s in place, creation succeeds, and the check below confirms it — this regression guards the fix.",
     );
     world.md().check("the fix survives the pre-funded PDA (creation succeeds)", false, blocked);

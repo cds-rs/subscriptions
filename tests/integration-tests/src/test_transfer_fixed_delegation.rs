@@ -457,7 +457,7 @@ fn test_fixed_transfer_wrong_signer() {
 
     let (alice, _bob, delegation_pda, mint, _, bob_ata) = setup_fixed_delegation(&mut world, amount, expiry_ts, nonce);
 
-    // Mallory is the attacker.
+    // Mallory is the unauthorized caller.
     let mallory = world.actor("mallory");
 
     world.md().step("Mallory, not the delegatee, tries to pull against the delegation");
@@ -727,7 +727,7 @@ fn signer_accounts_must_be_signers() {
 
 #[test]
 fn test_fixed_transfer_delegator_mismatch_exploit() {
-    // This test demonstrates the access control vulnerability where an attacker
+    // This test demonstrates the access control vulnerability where a malicious delegatee
     // can use their own delegation to transfer funds from another user's account.
     let mut world = World::new(
         "Fixed transfer delegator-mismatch exploit is blocked",
@@ -737,14 +737,14 @@ fn test_fixed_transfer_delegator_mismatch_exploit() {
     let expiry_ts: i64 = world.now() + days(1) as i64;
     let nonce = 0;
 
-    // Setup: Alice (victim) with funds and Bob (attacker).
+    // Setup: Alice (victim) with funds and Bob (the malicious delegatee).
     let (alice, bob, _alice_delegation_pda, mint, alice_ata, bob_ata) =
         setup_fixed_delegation(&mut world, amount, expiry_ts, nonce);
 
     world.md().step("Bob initializes his own authority and a self-delegation");
     world.init_authority(&bob, mint, None).0.assert_ok();
 
-    // Attacker (Bob) creates a self-delegation (Bob -> Bob) with a large allowance.
+    // Bob creates a self-delegation (Bob -> Bob) with a large allowance.
     let (ix, bob_delegation_pda) =
         CreateDelegation::new(world.svm_mut(), &bob, mint, bob.pubkey()).nonce(nonce).fixed_ix(1_000_000_000, expiry_ts);
     world.prop(bob_delegation_pda, "Bob self-delegation");

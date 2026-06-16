@@ -782,7 +782,7 @@ fn delegator_can_revoke_sponsor_funded_before_expiry() {
 #[test]
 fn attacker_cannot_revoke_sponsor_funded_delegation() {
     let mut world = World::new(
-        "An attacker cannot revoke a sponsor-funded delegation",
+        "Mallory cannot revoke a sponsor-funded delegation",
         "Mallory cannot revoke even after expiry, despite naming the sponsor as receiver",
     );
     let delegator = world.actor("alice");
@@ -1070,7 +1070,7 @@ fn sponsor_revoke_subscription_with_wrong_plan_pda_rejected() {
 #[test]
 fn attacker_cannot_revoke_sponsor_funded_subscription() {
     let mut world = World::new(
-        "An attacker cannot revoke a sponsor-funded subscription",
+        "Mallory cannot revoke a sponsor-funded subscription",
         "Mallory cannot revoke even after the plan expires; she is neither delegator nor payer",
     );
     let plan_end_ts = world.now() + hours(2) as i64;
@@ -1078,7 +1078,7 @@ fn attacker_cannot_revoke_sponsor_funded_subscription() {
 
     let mallory = world.actor("mallory");
 
-    // Even after the plan expires, an attacker (not delegator and not payer)
+    // Even after the plan expires, Mallory (neither delegator nor payer)
     // must not be able to revoke.
     world.warp(hours(3));
 

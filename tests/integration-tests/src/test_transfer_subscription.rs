@@ -160,7 +160,7 @@ fn test_transfer_subscription_puller_authorized() {
 fn test_transfer_subscription_unauthorized_caller() {
     let mut world = World::new(
         "Transfer subscription: an unauthorized caller is refused",
-        "a random signer (neither merchant nor whitelisted puller) cannot pull",
+        "Mallory (neither merchant nor whitelisted puller) cannot pull",
     );
 
     let amount_per_period = 50_000_000u64;

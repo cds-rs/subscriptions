@@ -201,7 +201,7 @@ fn create_fixed_delegation_with_prefunded_pda() {
     let delegatee = solana_pubkey::Pubkey::new_unique();
     world.prop(delegatee, "delegatee");
 
-    // Simulate an attacker pre-funding the delegation PDA address with lamports.
+    // Simulate Mallory pre-funding the delegation PDA address with lamports.
     let (subscription_authority_pda, _) = get_delegation_pda(
         &crate::tests::pda::get_subscription_authority_pda(&payer.pubkey(), &mint).0,
         &payer.pubkey(),

@@ -1,4 +1,4 @@
-## An attacker cannot revoke a sponsor-funded delegation — PASS
+## Mallory cannot revoke a sponsor-funded delegation — PASS
 
 > Mallory cannot revoke even after expiry, despite naming the sponsor as receiver
 

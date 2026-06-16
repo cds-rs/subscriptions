@@ -1,4 +1,4 @@
-## An attacker cannot revoke a sponsor-funded subscription — PASS
+## Mallory cannot revoke a sponsor-funded subscription — PASS
 
 > Mallory cannot revoke even after the plan expires; she is neither delegator nor payer
 

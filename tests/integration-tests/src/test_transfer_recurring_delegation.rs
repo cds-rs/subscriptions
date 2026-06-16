@@ -591,7 +591,7 @@ fn signer_accounts_must_be_signers() {
 
 #[test]
 fn test_recurring_transfer_delegator_mismatch_exploit() {
-    // This test demonstrates the access control vulnerability where an attacker
+    // This test demonstrates the access control vulnerability where a malicious delegatee
     // can use their own delegation to transfer funds from another user's account
     let mut world = World::new(
         "Recurring transfer delegator-mismatch exploit is blocked",
@@ -603,14 +603,14 @@ fn test_recurring_transfer_delegator_mismatch_exploit() {
     let expiry_ts: i64 = world.now() + days(1) as i64;
     let nonce = 0;
 
-    // Setup: Alice (victim) with funds and Bob (attacker)
+    // Setup: Alice (victim) with funds and Bob (the malicious delegatee)
     let (alice, bob, _alice_delegation_pda, mint, alice_ata, bob_ata, _) =
         setup_recurring_delegation(&mut world, amount_per_period, period_length_s, start_ts, expiry_ts, nonce);
 
     world.md().step("Bob initializes his own authority and a self-delegation");
     world.init_authority(&bob, mint, None).0.assert_ok();
 
-    // Attacker (Bob) creates a self-delegation (Bob -> Bob) with a large allowance
+    // Bob creates a self-delegation (Bob -> Bob) with a large allowance
     let (ix, bob_delegation_pda) = CreateDelegation::new(world.svm_mut(), &bob, mint, bob.pubkey())
         .nonce(nonce)
         .recurring_ix(1_000_000_000, period_length_s, start_ts, expiry_ts);
@@ -620,7 +620,7 @@ fn test_recurring_transfer_delegator_mismatch_exploit() {
     world.md().step("Bob spoofs Alice as the delegator while using his own delegation; it is refused");
     let transfer_amount: u64 = 30_000_000;
 
-    // Exploit: Attacker tries to transfer from Alice's ATA using their own delegation
+    // Exploit: Bob tries to transfer from Alice's ATA using his own delegation
     // by passing Alice's delegator_pubkey in the instruction data
     let ix = TransferDelegation::new(world.svm_mut(), &bob, alice.pubkey(), mint, bob_delegation_pda)
         .amount(transfer_amount)

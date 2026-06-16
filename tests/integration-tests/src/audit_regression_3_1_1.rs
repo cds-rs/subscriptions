@@ -21,7 +21,7 @@ fn finding_3_1_1_recurring_pull_before_start_ts() {
         "the PR6 guard refuses a recurring pull before start_ts (Cantina HIGH 3.1.1)",
     );
     let alice = world.actor("alice"); // delegator
-    let bob = world.actor("bob"); // delegatee (the attacker pulling early)
+    let bob = world.actor("bob"); // delegatee (pulls early, exploiting the missing guard)
 
     let mint = world.usdc_mint(&alice);
     world.prop(mint, "USDC mint");
