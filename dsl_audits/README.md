@@ -12,6 +12,18 @@ The four reports here are the **before**: each exploit succeeds. They are static
 copies committed on `turbin3` (the fixed branch) for reference; the live,
 runnable reproduction lives on the `dsl-audit` branch (see Methodology).
 
+## Before and after — the showcase
+
+The same exploit, run against the vulnerable program (where it lands) and the
+fixed program (where it is refused), **co-located in one report each** with the
+full observability surface — the structured CPI trees and the authority/ownership
+graphs, so the attack and its absence are both legible:
+
+- [3.1.1 — a recurring pull before the delegation starts](./before-after-3-1-1.md)
+- [3.1.2 — a ghost plan drains the subscriber](./before-after-3-1-2.md) — the 50,000× drain
+- [3.1.3 — a pre-funded PDA blocks creation](./before-after-3-1-3.md)
+- [3.1.4 — a ghost plan siphons past the agreement](./before-after-3-1-4.md)
+
 ## Findings
 
 | # | finding | exploit | fix | refused (after) with |
