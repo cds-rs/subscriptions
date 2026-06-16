@@ -16,7 +16,7 @@ workspace = true
 [dependencies]
 subscriptions = { package = "subscriptions-program", path = "../../program", features = ["no-entrypoint"] }
 tests-subscriptions = { path = "../integration-tests" }
-litesvm-utils = { path = "/Users/amal/oss/upstream/anchor-litesvm/crates/litesvm-utils" }
+litesvm-utils = { git = "https://github.com/cds-rs/anchor-litesvm", branch = "turbin3" }
 litesvm = "^0.12"
 litesvm-token = { version = "^0.12", features = ["token-2022"] }
 solana-clock = "^3"

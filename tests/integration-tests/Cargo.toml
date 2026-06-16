@@ -19,7 +19,7 @@ litesvm = "^0.12"
 litesvm-token = { version = "^0.12", features = ["token-2022"] }
 # The anchor-litesvm observability foundation (anchor-free line). Local path for
 # now; repoint to `git = cds-rs/anchor-litesvm, branch = turbin3` once promoted.
-litesvm-utils = { path = "/Users/amal/oss/upstream/anchor-litesvm/crates/litesvm-utils" }
+litesvm-utils = { git = "https://github.com/cds-rs/anchor-litesvm", branch = "turbin3" }
 solana-account = "~3.4"
 solana-clock = "^3"
 solana-instruction = "^3"
