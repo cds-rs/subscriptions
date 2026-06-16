@@ -1,0 +1,29 @@
+[package]
+name = "observed-subscriptions"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+
+# A sibling of `tests-subscriptions`: the same flows, re-expressed in the
+# anchor-litesvm testing DSL. It reuses that crate's account builders for setup
+# and adds the observability surface (structured CPI tree, sequence diagrams
+# with and without lifelines, authority and ownership graphs, decoded events).
+
+[lints]
+workspace = true
+
+[dependencies]
+subscriptions = { package = "subscriptions-program", path = "../../program", features = ["no-entrypoint"] }
+tests-subscriptions = { path = "../integration-tests" }
+litesvm-utils = { path = "/Users/amal/oss/upstream/anchor-litesvm/crates/litesvm-utils" }
+litesvm = "^0.12"
+litesvm-token = { version = "^0.12", features = ["token-2022"] }
+solana-clock = "^3"
+solana-instruction = "^3"
+solana-keypair = "3.1"
+solana-pubkey = "^4"
+solana-signer = "^3"
+spl-associated-token-account-interface = "2.0.0"
+spl-token-interface = "3.0.0"
+

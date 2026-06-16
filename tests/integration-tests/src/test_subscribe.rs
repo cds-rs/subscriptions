@@ -1,193 +1,256 @@
+//! `subscribe`, converted to the World/scenario pattern.
+//!
+//! Each test builds its own `World`, draws Alice (subscriber), the merchant
+//! (plan owner), and the occasional counterparty (`bob`, `charlie`) or `sponsor`
+//! from the cast, stages a plan through `setup_plan`, then performs the
+//! subscribe action through the observed `send_*`. Every send renders its surface
+//! into the test's report under `target/md-reports/`.
+
+use solana_instruction::{AccountMeta, Instruction};
+use solana_pubkey::Pubkey;
+use solana_signer::Signer;
+
 use crate::{
     event_engine::event_authority_pda,
     instructions::subscribe,
     state::{Plan, PlanStatus, SubscriptionAuthority, SubscriptionDelegation},
     tests::{
-        asserts::TransactionResultExt,
-        constants::{MINT_DECIMALS, PROGRAM_ID, SYSTEM_PROGRAM_ID, TOKEN_PROGRAM_ID},
+        constants::{PROGRAM_ID, SYSTEM_PROGRAM_ID},
         pda::{get_plan_pda, get_subscription_authority_pda, get_subscription_pda},
-        utils::{
-            build_and_send_transaction, current_ts, days, init_ata, init_mint, init_wallet,
-            initialize_subscription_authority_action, move_clock_forward, setup, CloseSubscriptionAuthority,
-            CreatePlan, Subscribe, UpdatePlan,
+        utils::{as_pubkey, 
+            days, CloseSubscriptionAuthority, CreatePlan, ObservedResultExt, Subscribe,
+            UpdatePlan, World,
         },
     },
     AccountDiscriminator, SubscriptionsError,
 };
-use solana_instruction::{AccountMeta, Instruction};
-use solana_keypair::Keypair;
-use solana_pubkey::Pubkey;
-use solana_signer::Signer;
 
+/// Stage a merchant's plan and Alice's authority on `world`: Alice (subscriber)
+/// with her ATA and SubscriptionAuthority, plus the merchant's plan (id 1, 50
+/// tokens, the given period and end). Mirrors the file's old `setup_plan`, but
+/// every send is observed. Returns the cast and the derived plan accounts.
 fn setup_plan(
+    world: &mut World,
     period_hours: u64,
     end_ts: i64,
 ) -> (
-    litesvm::LiteSVM,
-    Keypair, // alice (subscriber)
-    Keypair, // merchant
-    Pubkey,  // mint
-    Pubkey,  // plan_pda
-    u8,      // plan_bump
+    solana_keypair::Keypair, // alice (subscriber)
+    solana_keypair::Keypair, // merchant
+    Pubkey,                  // mint
+    Pubkey,                  // plan_pda
+    u8,                      // plan_bump
 ) {
-    let (mut litesvm, alice) = setup();
-    let merchant = Keypair::new();
-    litesvm.airdrop(&merchant.pubkey(), 10_000_000_000).unwrap();
+    let alice = world.actor("alice");
+    let merchant = world.actor("merchant");
 
-    let mint = init_mint(&mut litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
-    let _alice_ata = init_ata(&mut litesvm, mint, alice.pubkey(), 100_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _alice_ata = world.fund_ata(mint, &alice, 100_000_000);
 
     // Initialize subscription_authority for alice
-    initialize_subscription_authority_action(&mut litesvm, &alice, mint).0.assert_ok();
+    world.md().step("Stage: Alice's authority and the merchant's plan");
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     // Create plan
-    let (res, plan_pda) = CreatePlan::new(&mut litesvm, &merchant, mint)
-        .plan_id(1)
-        .amount(50_000_000)
-        .period_hours(period_hours)
-        .end_ts(end_ts)
-        .execute();
-    res.assert_ok();
+    let plan_ix = {
+        CreatePlan::new(world.svm_mut(), &merchant, mint)
+            .plan_id(1)
+            .amount(50_000_000)
+            .period_hours(period_hours)
+            .end_ts(end_ts)
+            .instruction()
+    };
+    let (plan_pda, plan_bump) = get_plan_pda(&merchant.pubkey(), 1);
+    world.prop(plan_pda, "Plan");
+    world.send_ok(&[plan_ix], &[&merchant], "CreatePlan");
 
-    let (_, plan_bump) = get_plan_pda(&merchant.pubkey(), 1);
-
-    (litesvm, alice, merchant, mint, plan_pda, plan_bump)
+    (alice, merchant, mint, plan_pda, plan_bump)
 }
 
 #[test]
 fn subscribe_happy_path() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new("Subscribe (happy path)", "Alice subscribes to the merchant's active plan");
+    let end_ts = world.now() + days(30) as i64;
+    let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
-    let res = Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute();
-    res.assert_ok();
+    let sub_ix = { Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).instruction() };
+    let (subscription_pda, _) = get_subscription_pda(&plan_pda, &alice.pubkey());
+    world.prop(subscription_pda, "Subscription");
+    world.md().step("Alice subscribes to the plan");
+    world.send_ok(&[sub_ix], &[&alice], "Subscribe");
 
     // Verify subscription state
-    let (subscription_pda, _) = get_subscription_pda(&plan_pda, &alice.pubkey());
-    let sub_account = litesvm.get_account(&subscription_pda).unwrap();
-    assert_eq!(sub_account.data.len(), SubscriptionDelegation::LEN);
+    let sub_account = world.svm().get_account(&subscription_pda).unwrap();
+    world.md().check("the subscription account is sized correctly", SubscriptionDelegation::LEN, sub_account.data.len());
 
     let sub = SubscriptionDelegation::load(&sub_account.data).unwrap();
-    assert_eq!(sub.header.discriminator, AccountDiscriminator::SubscriptionDelegation as u8);
-    assert_eq!(sub.header.delegator.to_bytes(), alice.pubkey().to_bytes());
-    assert_eq!(sub.header.delegatee.to_bytes(), plan_pda.to_bytes());
-    assert_eq!(sub.header.payer.to_bytes(), alice.pubkey().to_bytes());
-    assert_eq!({ sub.amount_pulled_in_period }, 0);
-    assert_eq!({ sub.expires_at_ts }, 0);
+    world.md().check(
+        "the account is tagged SubscriptionDelegation",
+        AccountDiscriminator::SubscriptionDelegation as u8,
+        sub.header.discriminator,
+    );
+    world.md().check("the delegator is Alice", alice.pubkey(), as_pubkey(sub.header.delegator.to_bytes()));
+    world.md().check("the delegatee is the plan", plan_pda, as_pubkey(sub.header.delegatee.to_bytes()));
+    world.md().check("the payer defaults to Alice", alice.pubkey(), as_pubkey(sub.header.payer.to_bytes()));
+    let amount_pulled = sub.amount_pulled_in_period;
+    let expires_at = sub.expires_at_ts;
+    world.md().check("nothing has been pulled yet", 0u64, amount_pulled);
+    world.md().check("the subscription has no expiry", 0i64, expires_at);
 }
 
 #[test]
 fn subscribe_plan_sunset_rejected() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new("Subscribe rejects a sunset plan", "subscribing to a plan in Sunset status is refused");
+    let end_ts = world.now() + days(30) as i64;
+    let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
-    UpdatePlan::new(&mut litesvm, &merchant, plan_pda).status(PlanStatus::Sunset).end_ts(end_ts).execute().assert_ok();
+    let update_ix =
+        { UpdatePlan::new(world.svm_mut(), &merchant, plan_pda).status(PlanStatus::Sunset).end_ts(end_ts).instruction() };
+    world.md().step("The merchant sunsets the plan");
+    world.send_ok(&[update_ix], &[&merchant], "UpdatePlan (Sunset)");
 
-    let res = Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute();
-    res.assert_err(SubscriptionsError::PlanSunset);
+    let sub_ix = { Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).instruction() };
+    world.md().step("Alice tries to subscribe to the sunset plan");
+    world.send_err(&[sub_ix], &[&alice], "Subscribe (sunset)", SubscriptionsError::PlanSunset);
 }
 
 #[test]
 fn subscribe_plan_expired_rejected() {
-    let end_ts = current_ts() + days(2) as i64;
-    let (mut litesvm, alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new("Subscribe rejects an expired plan", "subscribing after the plan's end_ts is refused");
+    let end_ts = world.now() + days(2) as i64;
+    let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
-    move_clock_forward(&mut litesvm, days(3));
+    world.md().step("Time advances past the plan's end");
+    world.warp(days(3));
 
-    let res = Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute();
-    res.assert_err(SubscriptionsError::PlanExpired);
+    let sub_ix = { Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).instruction() };
+    world.md().step("Alice tries to subscribe to the expired plan");
+    world.send_err(&[sub_ix], &[&alice], "Subscribe (expired)", SubscriptionsError::PlanExpired);
 }
 
 #[test]
 fn subscribe_mint_mismatch_rejected() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, merchant, _mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new(
+        "Subscribe rejects a mint mismatch",
+        "subscribing with an authority over a different mint is refused",
+    );
+    let end_ts = world.now() + days(30) as i64;
+    let (alice, merchant, _mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
     // Create a different mint and subscription_authority for it
-    let other_mint = init_mint(&mut litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
-    let _other_ata = init_ata(&mut litesvm, other_mint, alice.pubkey(), 100_000_000);
-    initialize_subscription_authority_action(&mut litesvm, &alice, other_mint).0.assert_ok();
+    let other_mint =
+        world.usdc_mint(&alice);
+    world.prop(other_mint, "other mint");
+    let _other_ata = world.fund_ata(other_mint, &alice, 100_000_000);
+    world.md().step("Alice initializes an authority over a different mint");
+    world.init_authority(&alice, other_mint, None).0.assert_ok();
 
-    let res = Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, other_mint).execute();
-    res.assert_err(SubscriptionsError::MintMismatch);
+    let sub_ix =
+        { Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, other_mint).instruction() };
+    world.md().step("Alice subscribes pointing at the wrong mint's authority");
+    world.send_err(&[sub_ix], &[&alice], "Subscribe (mint mismatch)", SubscriptionsError::MintMismatch);
 }
 
 #[test]
 fn subscribe_non_subscriber_subscription_authority_rejected() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, _alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new(
+        "Subscribe by a second user",
+        "a different user with their own authority subscribes to the same plan",
+    );
+    let end_ts = world.now() + days(30) as i64;
+    let (_alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
-    // Create another user with their own subscription_authority
-    let bob = init_wallet(&mut litesvm, 10_000_000_000);
-    let _bob_ata = init_ata(&mut litesvm, mint, bob.pubkey(), 100_000_000);
-    initialize_subscription_authority_action(&mut litesvm, &bob, mint).0.assert_ok();
+    // Create another user (bob) with their own subscription_authority
+    let bob = world.actor("bob");
+    let _bob_ata = world.fund_ata(mint, &bob, 100_000_000);
+    world.md().step("Bob initializes his own authority");
+    world.init_authority(&bob, mint, None).0.assert_ok();
 
-    // Try to subscribe using bob's keys but alice's subscription_authority would be wrong
-    // Actually bob subscribes normally, this should succeed
-    let res = Subscribe::new(&mut litesvm, &bob, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute();
-    res.assert_ok();
+    // Bob subscribes normally with his own authority; this should succeed.
+    let sub_ix = { Subscribe::new(world.svm_mut(), &bob, merchant.pubkey(), plan_pda, 1, plan_bump, mint).instruction() };
+    world.md().step("Bob subscribes with his own authority");
+    world.send_ok(&[sub_ix], &[&bob], "Subscribe (bob)");
 }
 
 #[test]
 fn subscribe_no_subscription_authority_rejected() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, _alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new(
+        "Subscribe without an authority",
+        "subscribing with no SubscriptionAuthority PDA in place is refused",
+    );
+    let end_ts = world.now() + days(30) as i64;
+    let (_alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
-    // Create user without subscription_authority
-    let charlie = init_wallet(&mut litesvm, 10_000_000_000);
-    let _charlie_ata = init_ata(&mut litesvm, mint, charlie.pubkey(), 100_000_000);
+    // Charlie has no subscription_authority.
+    let charlie = world.actor("charlie");
+    let _charlie_ata = world.fund_ata(mint, &charlie, 100_000_000);
 
-    let res = Subscribe::new(&mut litesvm, &charlie, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute();
-    // Should fail because subscription_authority PDA doesn't exist (not owned by program)
-    res.assert_err(SubscriptionsError::InvalidSubscriptionAuthorityPda);
+    let sub_ix =
+        { Subscribe::new(world.svm_mut(), &charlie, merchant.pubkey(), plan_pda, 1, plan_bump, mint).instruction() };
+    world.md().step("Charlie subscribes with no authority PDA in place");
+    // Should fail because subscription_authority PDA doesn't exist (not owned by program).
+    world.send_err(&[sub_ix], &[&charlie], "Subscribe (no authority)", SubscriptionsError::InvalidSubscriptionAuthorityPda);
 }
 
 #[test]
 fn subscribe_with_sponsor() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
-    let sponsor = init_wallet(&mut litesvm, 10_000_000_000);
+    let mut world = World::new("Subscribe with a sponsor", "a sponsor pays rent and fee; Alice's lamports stay untouched");
+    let end_ts = world.now() + days(30) as i64;
+    let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
+    let sponsor = world.actor("sponsor");
 
-    let alice_balance_before = litesvm.get_account(&alice.pubkey()).unwrap().lamports;
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let alice_balance_before = world.svm().get_account(&alice.pubkey()).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
-    let res =
-        Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).payer(&sponsor).execute();
-    res.assert_ok();
+    let sub_ix = {
+        Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).payer(&sponsor).instruction()
+    };
+    world.md().step("Alice subscribes; the sponsor pays");
+    world.send_ok(&[sub_ix], &[&sponsor, &alice], "Subscribe (sponsored)");
 
     // Subscriber must not be charged.
-    let alice_balance_after = litesvm.get_account(&alice.pubkey()).unwrap().lamports;
-    assert_eq!(alice_balance_after, alice_balance_before);
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
-    assert!(sponsor_balance_after < sponsor_balance_before);
+    let alice_balance_after = world.svm().get_account(&alice.pubkey()).unwrap().lamports;
+    world.md().check("Alice's lamports are untouched", alice_balance_before, alice_balance_after);
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
+    world.md().check("the sponsor was charged", true, sponsor_balance_after < sponsor_balance_before);
 
     // header.payer should be sponsor.
     let (subscription_pda, _) = get_subscription_pda(&plan_pda, &alice.pubkey());
-    let sub_account = litesvm.get_account(&subscription_pda).unwrap();
+    let sub_account = world.svm().get_account(&subscription_pda).unwrap();
     let sub = SubscriptionDelegation::load(&sub_account.data).unwrap();
-    assert_eq!(sub.header.payer.to_bytes(), sponsor.pubkey().to_bytes());
-    assert_eq!(sub.header.delegator.to_bytes(), alice.pubkey().to_bytes());
+    world.md().check("the payer is the sponsor", sponsor.pubkey(), as_pubkey(sub.header.payer.to_bytes()));
+    world.md().check("the delegator is still Alice", alice.pubkey(), as_pubkey(sub.header.delegator.to_bytes()));
 }
 
 #[test]
 fn subscribe_duplicate_rejected() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new("Subscribe rejects a duplicate", "subscribing twice to the same plan is refused");
+    let end_ts = world.now() + days(30) as i64;
+    let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
     // First subscription should succeed
-    Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute().assert_ok();
+    let first_ix =
+        { Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).instruction() };
+    world.md().step("Alice subscribes once");
+    world.send_ok(&[first_ix], &[&alice], "Subscribe (first)");
 
     // Second subscription to same plan should fail (PDA already exists)
-    let res = Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute();
-    res.assert_err(SubscriptionsError::AlreadySubscribed);
+    let second_ix =
+        { Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).instruction() };
+    world.md().step("Alice subscribes a second time to the same plan");
+    world.send_err(&[second_ix], &[&alice], "Subscribe (duplicate)", SubscriptionsError::AlreadySubscribed);
 }
 
 #[test]
 fn subscribe_rejects_stale_subscription_authority_generation() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new(
+        "Subscribe rejects a stale authority generation",
+        "a subscribe carrying a closed authority's init_id is refused",
+    );
+    let end_ts = world.now() + days(30) as i64;
+    let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
-    let plan_account = litesvm.get_account(&plan_pda).unwrap();
+    let plan_account = world.svm().get_account(&plan_pda).unwrap();
     let plan = Plan::load(&plan_account.data).unwrap();
     let live_amount = plan.data.terms.amount;
     let live_period_hours = plan.data.terms.period_hours;
@@ -195,15 +258,17 @@ fn subscribe_rejects_stale_subscription_authority_generation() {
     let live_mint = plan.data.mint;
 
     let (subscription_authority_pda, _) = get_subscription_authority_pda(&alice.pubkey(), &mint);
-    let authority_before_account = litesvm.get_account(&subscription_authority_pda).unwrap();
+    let authority_before_account = world.svm().get_account(&subscription_authority_pda).unwrap();
     let authority_before = SubscriptionAuthority::load(&authority_before_account.data).unwrap();
     let stale_init_id = authority_before.init_id;
 
-    CloseSubscriptionAuthority::new(&mut litesvm, &alice, mint).execute().assert_ok();
-    move_clock_forward(&mut litesvm, 1);
-    initialize_subscription_authority_action(&mut litesvm, &alice, mint).0.assert_ok();
+    let close_ix = { CloseSubscriptionAuthority::new(world.svm_mut(), &alice, mint).instruction() };
+    world.md().step("Alice closes her authority, then re-initializes it (new generation)");
+    world.send_ok(&[close_ix], &[&alice], "CloseSubscriptionAuthority");
+    world.warp(1);
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
-    let authority_after_account = litesvm.get_account(&subscription_authority_pda).unwrap();
+    let authority_after_account = world.svm().get_account(&subscription_authority_pda).unwrap();
     let authority_after = SubscriptionAuthority::load(&authority_after_account.data).unwrap();
     let new_init_id = authority_after.init_id;
     assert_ne!(new_init_id, stale_init_id);
@@ -236,17 +301,21 @@ fn subscribe_rejects_stale_subscription_authority_generation() {
 
     let ix = Instruction { program_id: PROGRAM_ID, accounts, data };
 
-    let res = build_and_send_transaction(&mut litesvm, &[&alice], &alice.pubkey(), &ix);
-    res.assert_err(SubscriptionsError::StaleSubscriptionAuthority);
+    world.md().step("Alice subscribes carrying the stale (closed) authority init_id");
+    world.send_err(&[ix], &[&alice], "Subscribe (stale authority)", SubscriptionsError::StaleSubscriptionAuthority);
 }
 
 #[test]
 fn subscribe_rejects_stale_expected_terms() {
-    let end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, merchant, mint, plan_pda, plan_bump) = setup_plan(1, end_ts);
+    let mut world = World::new(
+        "Subscribe rejects stale expected terms",
+        "a subscribe carrying a stale expected_amount is refused",
+    );
+    let end_ts = world.now() + days(30) as i64;
+    let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
     // Snapshot live terms, then submit subscribe with a stale `expected_amount`.
-    let plan_account = litesvm.get_account(&plan_pda).unwrap();
+    let plan_account = world.svm().get_account(&plan_pda).unwrap();
     let plan = Plan::load(&plan_account.data).unwrap();
     let live_amount = plan.data.terms.amount;
     let stale_amount = live_amount.wrapping_add(1);
@@ -255,7 +324,7 @@ fn subscribe_rejects_stale_expected_terms() {
     let live_mint = plan.data.mint;
 
     let (subscription_authority_pda, _) = get_subscription_authority_pda(&alice.pubkey(), &mint);
-    let subscription_authority_account = litesvm.get_account(&subscription_authority_pda).unwrap();
+    let subscription_authority_account = world.svm().get_account(&subscription_authority_pda).unwrap();
     let subscription_authority = SubscriptionAuthority::load(&subscription_authority_account.data).unwrap();
     let live_subscription_authority_init_id = subscription_authority.init_id;
     let (subscription_pda, _) = get_subscription_pda(&plan_pda, &alice.pubkey());
@@ -286,6 +355,6 @@ fn subscribe_rejects_stale_expected_terms() {
 
     let ix = Instruction { program_id: PROGRAM_ID, accounts, data };
 
-    let res = build_and_send_transaction(&mut litesvm, &[&alice], &alice.pubkey(), &ix);
-    res.assert_err(SubscriptionsError::PlanTermsMismatch);
+    world.md().step("Alice subscribes carrying a stale expected_amount");
+    world.send_err(&[ix], &[&alice], "Subscribe (stale terms)", SubscriptionsError::PlanTermsMismatch);
 }

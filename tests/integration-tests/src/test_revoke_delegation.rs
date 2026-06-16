@@ -1,156 +1,201 @@
+//! `revoke_delegation` (and `revoke_subscription`), converted to the World/scenario pattern.
+//!
+//! Each test builds its own `World`, draws actors from the cast (`alice` the
+//! delegator/subscriber, `sponsor` the payer, `mallory` the adversary), and
+//! routes every on-chain action through the observed `send_*` so the surface
+//! renders into the test's report under `target/md-reports/`.
+
+use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
 use crate::{
-    tests::{
-        asserts::TransactionResultExt,
-        constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
-        utils::{
-            current_ts, days, hours, init_ata, init_mint, init_wallet, initialize_subscription_authority_action,
-            move_clock_forward, setup, setup_with_subscription, CancelSubscription, CreateDelegation,
-            CreateSubscription, RevokeDelegation, RevokeSubscription,
+    tests::utils::{
+            days, hours, init_mint, CancelSubscription, CreateDelegation, CreateSubscription, ObservedResultExt,
+            RevokeDelegation, RevokeSubscription, World,
         },
-    },
     AccountDiscriminator, FixedDelegation, RecurringDelegation, SubscriptionsError,
 };
 
 #[test]
 fn revoke_fixed_delegation() {
-    let (litesvm, user) = &mut setup();
-    let payer = user;
+    let mut world = World::new(
+        "Revoke a fixed delegation",
+        "the delegator revokes her own fixed delegation and recovers the rent",
+    );
+    let alice = world.actor("alice");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(payer.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, payer.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, payer, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, delegation_pda) =
-        CreateDelegation::new(litesvm, payer, mint, delegatee).nonce(nonce).fixed(100, current_ts() + 1000);
-    res.assert_ok();
+    let expiry = world.now() + 1000;
+    world.md().step("Alice creates a fixed delegation");
+    let (ix, delegation_pda) = CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).fixed_ix(100, expiry);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateFixedDelegation");
 
-    let account_before = litesvm.get_account(&delegation_pda);
+    let account_before = world.svm().get_account(&delegation_pda);
     assert!(account_before.is_some());
     let binding = account_before.unwrap();
     let delegation_rent = binding.lamports;
     let delegation = FixedDelegation::load(&binding.data).unwrap();
-    assert_eq!(delegation.header.discriminator, AccountDiscriminator::FixedDelegation as u8);
+    world.md().check(
+        "the account is tagged FixedDelegation",
+        AccountDiscriminator::FixedDelegation as u8,
+        delegation.header.discriminator,
+    );
 
-    let delegator_balance_before = litesvm.get_account(&payer.pubkey()).unwrap().lamports;
+    let delegator_balance_before = world.svm().get_account(&alice.pubkey()).unwrap().lamports;
 
-    let res = RevokeDelegation::new(litesvm, payer, mint, delegatee, nonce).execute();
-    res.assert_ok();
+    world.md().step("Alice revokes the delegation");
+    let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).instruction();
+    world.send_ok(&[ix], &[&alice], "RevokeDelegation");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 
-    let delegator_balance_after = litesvm.get_account(&payer.pubkey()).unwrap().lamports;
-    assert!(delegator_balance_after > delegator_balance_before);
+    let delegator_balance_after = world.svm().get_account(&alice.pubkey()).unwrap().lamports;
+    world.md().check("the rent flows back to Alice", true, delegator_balance_after > delegator_balance_before);
     assert!(delegator_balance_after >= delegator_balance_before + delegation_rent - 10000);
 }
 
 #[test]
 fn revoke_recurring_delegation() {
-    let (litesvm, user) = &mut setup();
-    let payer = user;
+    let mut world = World::new(
+        "Revoke a recurring delegation",
+        "the delegator revokes her own recurring delegation and recovers the rent",
+    );
+    let alice = world.actor("alice");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(payer.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, payer.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, payer, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
     let epoch = days(1);
-    let expiry_ts = current_ts() + days(2) as i64;
-    let (res, delegation_pda) = CreateDelegation::new(litesvm, payer, mint, delegatee).nonce(nonce).recurring(
-        100,
-        epoch,
-        current_ts(),
-        expiry_ts,
-    );
-    res.assert_ok();
+    let start_ts = world.now();
+    let expiry_ts = world.now() + days(2) as i64;
+    world.md().step("Alice creates a recurring delegation");
+    let (ix, delegation_pda) =
+        CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).recurring_ix(100, epoch, start_ts, expiry_ts);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateRecurringDelegation");
 
-    let account_before = litesvm.get_account(&delegation_pda);
+    let account_before = world.svm().get_account(&delegation_pda);
     assert!(account_before.is_some());
     let binding = account_before.unwrap();
     let delegation_rent = binding.lamports;
     let delegation = RecurringDelegation::load(&binding.data).unwrap();
-    assert_eq!(delegation.header.discriminator, AccountDiscriminator::RecurringDelegation as u8);
+    world.md().check(
+        "the account is tagged RecurringDelegation",
+        AccountDiscriminator::RecurringDelegation as u8,
+        delegation.header.discriminator,
+    );
 
-    let delegator_balance_before = litesvm.get_account(&payer.pubkey()).unwrap().lamports;
+    let delegator_balance_before = world.svm().get_account(&alice.pubkey()).unwrap().lamports;
 
-    let res = RevokeDelegation::new(litesvm, payer, mint, delegatee, nonce).execute();
-    res.assert_ok();
+    world.md().step("Alice revokes the delegation");
+    let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).instruction();
+    world.send_ok(&[ix], &[&alice], "RevokeDelegation");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 
-    let delegator_balance_after = litesvm.get_account(&payer.pubkey()).unwrap().lamports;
-    assert!(delegator_balance_after > delegator_balance_before);
+    let delegator_balance_after = world.svm().get_account(&alice.pubkey()).unwrap().lamports;
+    world.md().check("the rent flows back to Alice", true, delegator_balance_after > delegator_balance_before);
     assert!(delegator_balance_after >= delegator_balance_before + delegation_rent - 10000);
 }
 
 #[test]
 fn non_delegator_cannot_revoke() {
-    let (litesvm, user) = &mut setup();
-    let payer = user;
+    use solana_instruction::{AccountMeta, Instruction};
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(payer.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, payer.pubkey(), 1_000_000);
+    use crate::{instructions::revoke_delegation, tests::constants::PROGRAM_ID};
 
-    initialize_subscription_authority_action(litesvm, payer, mint).0.assert_ok();
+    let mut world = World::new(
+        "A non-delegator cannot revoke",
+        "Mallory, who is neither delegator nor payer, cannot revoke a live delegation",
+    );
+    let alice = world.actor("alice");
+    let mallory = world.actor("mallory");
+
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
+
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
     let epoch = days(1);
-    let expiry_ts = current_ts() + days(2) as i64;
-    let (res, delegation_pda) = CreateDelegation::new(litesvm, payer, mint, delegatee).nonce(nonce).recurring(
-        100,
-        epoch,
-        current_ts(),
-        expiry_ts,
-    );
-    res.assert_ok();
+    let start_ts = world.now();
+    let expiry_ts = world.now() + days(2) as i64;
+    world.md().step("Alice creates a recurring delegation");
+    let (ix, delegation_pda) =
+        CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).recurring_ix(100, epoch, start_ts, expiry_ts);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateRecurringDelegation");
 
-    let attacker = init_wallet(litesvm, 1_000_000_000);
-    let (subscription_authority_pda, _) = crate::tests::pda::get_subscription_authority_pda(&payer.pubkey(), &mint);
-    let res = revoke_delegation_action_with_pda(litesvm, &attacker, delegation_pda, subscription_authority_pda);
-    assert!(res.is_err());
+    // Mallory hand-builds a revoke and tries to close the delegation.
+    let ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(mallory.pubkey(), true), AccountMeta::new(delegation_pda, false)],
+        data: vec![*revoke_delegation::DISCRIMINATOR],
+    };
+    world.md().step("Mallory tries to revoke Alice's delegation");
+    let res = world.send(&[ix], &[&mallory], "RevokeDelegation (by Mallory)");
+    assert!(!res.is_success());
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_some());
     assert!(account_after.as_ref().map(|a| a.lamports).unwrap_or(0) > 0);
 }
 
 #[test]
 fn closed_account_is_zeroed() {
-    let (litesvm, user) = &mut setup();
-    let payer = user;
+    let mut world = World::new(
+        "A closed delegation account is zeroed",
+        "after revoke, any residual delegation bytes are all zero",
+    );
+    let alice = world.actor("alice");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(payer.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, payer.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, payer, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, delegation_pda) =
-        CreateDelegation::new(litesvm, payer, mint, delegatee).nonce(nonce).fixed(100, current_ts() + 1000);
-    res.assert_ok();
+    let expiry = world.now() + 1000;
+    let (ix, delegation_pda) = CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).fixed_ix(100, expiry);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateFixedDelegation");
 
-    let account_before = litesvm.get_account(&delegation_pda);
+    let account_before = world.svm().get_account(&delegation_pda);
     let _before_data = account_before.as_ref().unwrap().data.clone();
 
-    let res = RevokeDelegation::new(litesvm, payer, mint, delegatee, nonce).execute();
-    res.assert_ok();
+    world.md().step("Alice revokes the delegation");
+    let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).instruction();
+    world.send_ok(&[ix], &[&alice], "RevokeDelegation");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
 
     if let Some(account) = account_after {
         assert!(account.data.iter().all(|&byte| byte == 0), "All data should be zeroed after close");
@@ -159,29 +204,36 @@ fn closed_account_is_zeroed() {
 
 #[test]
 fn revoke_with_wrong_receiver_returns_unauthorized() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
-    let wrong_receiver = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "Revoke with a wrong receiver is unauthorized",
+        "a sponsor-funded delegation cannot route rent to an arbitrary receiver",
+    );
+    let alice = world.actor("alice");
+    let sponsor = world.actor("sponsor");
+    let wrong_receiver = Pubkey::new_unique();
+    world.prop(wrong_receiver, "wrong receiver");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, _) = CreateDelegation::new(litesvm, delegator, mint, delegatee)
+    let expiry = world.now() + 1000;
+    world.md().step("Alice creates a sponsor-funded fixed delegation");
+    let (ix, _) = CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee)
         .payer(&sponsor)
         .nonce(nonce)
-        .fixed(100, current_ts() + 1000);
-    res.assert_ok();
+        .fixed_ix(100, expiry);
+    world.send_ok(&[ix], &[&sponsor, &alice], "CreateFixedDelegation (sponsored)");
 
-    let result =
-        RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce).receiver(wrong_receiver.pubkey()).execute();
-
-    result.assert_err(SubscriptionsError::Unauthorized);
+    world.md().step("Alice revokes but points the rent at a wrong receiver");
+    let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).receiver(wrong_receiver).instruction();
+    world.send_err(&[ix], &[&alice], "RevokeDelegation (wrong receiver)", SubscriptionsError::Unauthorized);
 }
 
 #[test]
@@ -190,42 +242,48 @@ fn writable_accounts_must_be_writable() {
 
     use crate::{
         instructions::revoke_delegation,
-        tests::{
-            constants::PROGRAM_ID,
-            idl,
-            utils::{build_and_send_transaction, init_wallet},
-        },
+        tests::{constants::PROGRAM_ID, idl},
     };
 
     let writable = idl::writable_account_indices("revokeDelegation");
 
-    let (litesvm, user) = &mut setup();
-    let payer = user;
-    let fee_payer = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "Revoke: writable accounts must be writable",
+        "flipping any account the revoke writes to read-only is rejected",
+    );
+    let alice = world.actor("alice");
+    let fee_payer = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(payer.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, payer.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, payer, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, delegation_pda) =
-        CreateDelegation::new(litesvm, payer, mint, delegatee).nonce(nonce).fixed(100, current_ts() + 1000);
-    res.assert_ok();
+    let expiry = world.now() + 1000;
+    let (ix, delegation_pda) = CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).fixed_ix(100, expiry);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateFixedDelegation");
 
-    for (idx, _name, is_signer) in &writable {
-        let mut accounts = vec![AccountMeta::new(payer.pubkey(), true), AccountMeta::new(delegation_pda, false)];
+    for (idx, name, is_signer) in &writable {
+        let mut accounts = vec![AccountMeta::new(alice.pubkey(), true), AccountMeta::new(delegation_pda, false)];
 
-        // Flip writable account to readonly, preserving signer flag
+        // Flip writable account to readonly, preserving signer flag.
         let pubkey = accounts[*idx].pubkey;
         accounts[*idx] = AccountMeta::new_readonly(pubkey, *is_signer);
 
         let ix = Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_delegation::DISCRIMINATOR] };
 
-        let res = build_and_send_transaction(litesvm, &[&fee_payer, payer], &fee_payer.pubkey(), &ix);
-        res.assert_err(SubscriptionsError::AccountNotWritable);
+        world.send_err(
+            &[ix],
+            &[&fee_payer, &alice],
+            &format!("RevokeDelegation ({name} forced read-only)"),
+            SubscriptionsError::AccountNotWritable,
+        );
     }
 }
 
@@ -235,100 +293,123 @@ fn signer_accounts_must_be_signers() {
 
     use crate::{
         instructions::revoke_delegation,
-        tests::{
-            constants::PROGRAM_ID,
-            idl,
-            utils::{build_and_send_transaction, init_wallet},
-        },
+        tests::{constants::PROGRAM_ID, idl},
     };
 
     let signers = idl::signer_account_indices("revokeDelegation");
 
-    let (litesvm, user) = &mut setup();
-    let payer = user;
-    let fee_payer = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "Revoke: signer accounts must sign",
+        "flipping any required signer to non-signer is rejected",
+    );
+    let alice = world.actor("alice");
+    let fee_payer = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(payer.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, payer.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, payer, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, delegation_pda) =
-        CreateDelegation::new(litesvm, payer, mint, delegatee).nonce(nonce).fixed(100, current_ts() + 1000);
-    res.assert_ok();
+    let expiry = world.now() + 1000;
+    let (ix, delegation_pda) = CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).fixed_ix(100, expiry);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateFixedDelegation");
 
-    for (idx, _name, is_writable) in &signers {
-        let mut accounts = vec![AccountMeta::new(payer.pubkey(), true), AccountMeta::new(delegation_pda, false)];
+    for (idx, name, is_writable) in &signers {
+        let mut accounts = vec![AccountMeta::new(alice.pubkey(), true), AccountMeta::new(delegation_pda, false)];
 
-        // Flip signer to non-signer, preserving writable flag
+        // Flip signer to non-signer, preserving writable flag.
         let pubkey = accounts[*idx].pubkey;
         accounts[*idx] =
             if *is_writable { AccountMeta::new(pubkey, false) } else { AccountMeta::new_readonly(pubkey, false) };
 
         let ix = Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_delegation::DISCRIMINATOR] };
 
-        let res = build_and_send_transaction(litesvm, &[&fee_payer], &fee_payer.pubkey(), &ix);
-        res.assert_err(SubscriptionsError::NotSigner);
+        world.send_err(
+            &[ix],
+            &[&fee_payer],
+            &format!("RevokeDelegation ({name} forced non-signer)"),
+            SubscriptionsError::NotSigner,
+        );
     }
 }
 
 #[test]
 fn revoke_subscription_without_cancel_rejected() {
-    let (mut litesvm, alice, _merchant, _mint, plan_pda, _, subscription_pda) = setup_with_subscription();
+    let mut world = World::new(
+        "Revoke a subscription without cancelling is rejected",
+        "a live subscription cannot be revoked before it is cancelled",
+    );
+    let s = world.stage_subscription();
 
-    // Try to revoke without cancelling first
-    let result = RevokeSubscription::new(&mut litesvm, &alice, subscription_pda, plan_pda).execute();
-    result.assert_err(SubscriptionsError::SubscriptionNotCancelled);
+    world.md().step("Alice tries to revoke without cancelling first");
+    let ix = RevokeSubscription::new(world.svm_mut(), &s.alice, s.subscription_pda, s.plan_pda).instruction();
+    world.send_err(&[ix], &[&s.alice], "RevokeSubscription (not cancelled)", SubscriptionsError::SubscriptionNotCancelled);
 
-    // Account should still exist
-    let account = litesvm.get_account(&subscription_pda);
+    // Account should still exist.
+    let account = world.svm().get_account(&s.subscription_pda);
     assert!(account.is_some());
 }
 
 #[test]
 fn revoke_subscription_after_cancel_succeeds() {
-    let (mut litesvm, alice, _merchant, _mint, plan_pda, _plan_bump, subscription_pda) = setup_with_subscription();
+    let mut world = World::new(
+        "Revoke a subscription after cancel",
+        "once cancelled and past its period, a subscription can be revoked and the rent returns",
+    );
+    let s = world.stage_subscription();
 
-    let balance_before = litesvm.get_account(&alice.pubkey()).unwrap().lamports;
+    let balance_before = world.svm().get_account(&s.alice.pubkey()).unwrap().lamports;
 
-    // Cancel first
-    CancelSubscription::new(&mut litesvm, &alice, plan_pda, subscription_pda).execute().assert_ok();
+    world.md().step("Alice cancels the subscription");
+    let ix = CancelSubscription::new(world.svm_mut(), &s.alice, s.plan_pda, s.subscription_pda).instruction();
+    world.send_ok(&[ix], &[&s.alice], "CancelSubscription");
 
-    // Advance clock past the expiration (plan has 1h period)
-    move_clock_forward(&mut litesvm, hours(1));
+    // Advance clock past the expiration (plan has 1h period).
+    world.warp(hours(1));
 
-    // Then revoke
-    RevokeSubscription::new(&mut litesvm, &alice, subscription_pda, plan_pda).execute().assert_ok();
+    world.md().step("Alice revokes the cancelled subscription");
+    let ix = RevokeSubscription::new(world.svm_mut(), &s.alice, s.subscription_pda, s.plan_pda).instruction();
+    world.send_ok(&[ix], &[&s.alice], "RevokeSubscription");
 
-    // Account should be closed
-    let account = litesvm.get_account(&subscription_pda);
+    // Account should be closed.
+    let account = world.svm().get_account(&s.subscription_pda);
     assert!(
         account.is_none() || account.as_ref().map(|a| a.lamports).unwrap_or(0) == 0,
         "Subscription PDA should be closed"
     );
 
-    // Rent should be returned
-    let balance_after = litesvm.get_account(&alice.pubkey()).unwrap().lamports;
+    // Rent should be returned.
+    let balance_after = world.svm().get_account(&s.alice.pubkey()).unwrap().lamports;
     assert!(balance_after > balance_before - 10000);
 }
 
 #[test]
 fn revoke_subscription_with_future_expires_at_ts_rejected() {
-    let (mut litesvm, alice, _merchant, mint, plan_pda, _, _subscription_pda) = setup_with_subscription();
+    let mut world = World::new(
+        "Revoke a subscription with a future expiry is rejected",
+        "a subscription whose expires_at_ts is in the future is not yet revocable",
+    );
+    let s = world.stage_subscription();
 
-    // Manually inject a subscription with expires_at_ts in the future
-    let subscription_pda = CreateSubscription::new(&mut litesvm, plan_pda, alice.pubkey(), mint, current_ts())
-        .expires_at_ts(current_ts() + days(1) as i64)
+    // Manually inject a subscription with expires_at_ts in the future.
+    let now = world.now();
+    let subscription_pda = CreateSubscription::new(world.svm_mut(), s.plan_pda, s.alice.pubkey(), s.mint, now)
+        .expires_at_ts(now + days(1) as i64)
         .execute();
+    world.prop(subscription_pda, "Subscription");
 
-    let result = RevokeSubscription::new(&mut litesvm, &alice, subscription_pda, plan_pda).execute();
-    result.assert_err(SubscriptionsError::SubscriptionNotCancelled);
+    world.md().step("Alice tries to revoke a subscription whose period hasn't ended");
+    let ix = RevokeSubscription::new(world.svm_mut(), &s.alice, subscription_pda, s.plan_pda).instruction();
+    world.send_err(&[ix], &[&s.alice], "RevokeSubscription (future expiry)", SubscriptionsError::SubscriptionNotCancelled);
 
-    // Account should still exist
-    let account = litesvm.get_account(&subscription_pda);
+    // Account should still exist.
+    let account = world.svm().get_account(&subscription_pda);
     assert!(account.is_some());
 }
 
@@ -336,27 +417,36 @@ fn revoke_subscription_with_future_expires_at_ts_rejected() {
 fn test_revoke_fixed_version_agnostic() {
     use crate::state::header::VERSION_OFFSET;
 
-    let (litesvm, user) = &mut setup();
+    let mut world = World::new(
+        "Revoke a fixed delegation across versions",
+        "revoke works regardless of the stored header version byte",
+    );
+    let alice = world.actor("alice");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(user.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, user.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, user, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, delegation_pda) =
-        CreateDelegation::new(litesvm, user, mint, delegatee).nonce(nonce).fixed(100, current_ts() + 1000);
-    res.assert_ok();
+    let expiry = world.now() + 1000;
+    let (ix, delegation_pda) = CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).fixed_ix(100, expiry);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateFixedDelegation");
 
-    let mut account = litesvm.get_account(&delegation_pda).unwrap();
+    let mut account = world.svm().get_account(&delegation_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    litesvm.set_account(delegation_pda, account).unwrap();
+    world.svm_mut().set_account(delegation_pda, account).unwrap();
 
-    RevokeDelegation::new(litesvm, user, mint, delegatee, nonce).execute().assert_ok();
+    world.md().step("Alice revokes a delegation with a zeroed version byte");
+    let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).instruction();
+    world.send_ok(&[ix], &[&alice], "RevokeDelegation");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 }
 
@@ -364,31 +454,38 @@ fn test_revoke_fixed_version_agnostic() {
 fn test_revoke_recurring_version_agnostic() {
     use crate::state::header::VERSION_OFFSET;
 
-    let (litesvm, user) = &mut setup();
+    let mut world = World::new(
+        "Revoke a recurring delegation across versions",
+        "revoke works regardless of the stored header version byte",
+    );
+    let alice = world.actor("alice");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(user.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, user.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &alice, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, user, mint).0.assert_ok();
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, delegation_pda) = CreateDelegation::new(litesvm, user, mint, delegatee).nonce(nonce).recurring(
-        100,
-        days(1),
-        current_ts(),
-        current_ts() + days(2) as i64,
-    );
-    res.assert_ok();
+    let start_ts = world.now();
+    let expiry_ts = world.now() + days(2) as i64;
+    let (ix, delegation_pda) =
+        CreateDelegation::new(world.svm_mut(), &alice, mint, delegatee).nonce(nonce).recurring_ix(100, days(1), start_ts, expiry_ts);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&alice], "CreateRecurringDelegation");
 
-    let mut account = litesvm.get_account(&delegation_pda).unwrap();
+    let mut account = world.svm().get_account(&delegation_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    litesvm.set_account(delegation_pda, account).unwrap();
+    world.svm_mut().set_account(delegation_pda, account).unwrap();
 
-    RevokeDelegation::new(litesvm, user, mint, delegatee, nonce).execute().assert_ok();
+    world.md().step("Alice revokes a delegation with a zeroed version byte");
+    let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).instruction();
+    world.send_ok(&[ix], &[&alice], "RevokeDelegation");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 }
 
@@ -396,382 +493,432 @@ fn test_revoke_recurring_version_agnostic() {
 fn test_revoke_subscription_version_mismatch() {
     use crate::state::header::VERSION_OFFSET;
 
-    let (mut litesvm, alice, _merchant, _mint, plan_pda, _, subscription_pda) = setup_with_subscription();
+    let mut world = World::new(
+        "Revoke a subscription with a version mismatch",
+        "a subscription whose version byte was tampered requires migration before revoke",
+    );
+    let s = world.stage_subscription();
 
-    CancelSubscription::new(&mut litesvm, &alice, plan_pda, subscription_pda).execute().assert_ok();
+    world.md().step("Alice cancels the subscription");
+    let ix = CancelSubscription::new(world.svm_mut(), &s.alice, s.plan_pda, s.subscription_pda).instruction();
+    world.send_ok(&[ix], &[&s.alice], "CancelSubscription");
 
-    move_clock_forward(&mut litesvm, hours(1));
+    world.warp(hours(1));
 
-    let mut account = litesvm.get_account(&subscription_pda).unwrap();
+    let mut account = world.svm().get_account(&s.subscription_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    litesvm.set_account(subscription_pda, account).unwrap();
+    world.svm_mut().set_account(s.subscription_pda, account).unwrap();
 
-    RevokeSubscription::new(&mut litesvm, &alice, subscription_pda, plan_pda)
-        .execute()
-        .assert_err(SubscriptionsError::MigrationRequired);
+    world.md().step("Alice tries to revoke a subscription with a zeroed version byte");
+    let ix = RevokeSubscription::new(world.svm_mut(), &s.alice, s.subscription_pda, s.plan_pda).instruction();
+    world.send_err(&[ix], &[&s.alice], "RevokeSubscription (version mismatch)", SubscriptionsError::MigrationRequired);
 }
 
 #[test]
 fn sponsor_can_revoke_expired_fixed_delegation() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "A sponsor can revoke an expired fixed delegation",
+        "once the fixed delegation has expired past the drift window, the sponsor recovers its rent",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
-    let expiry_ts = current_ts() + hours(1) as i64;
+    let expiry_ts = world.now() + hours(1) as i64;
 
-    let (res, delegation_pda) =
-        CreateDelegation::new(litesvm, delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed(100, expiry_ts);
-    res.assert_ok();
+    world.md().step("Alice creates a sponsor-funded fixed delegation");
+    let (ix, delegation_pda) =
+        CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed_ix(100, expiry_ts);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateFixedDelegation (sponsored)");
 
-    let delegation_rent = litesvm.get_account(&delegation_pda).unwrap().lamports;
+    let delegation_rent = world.svm().get_account(&delegation_pda).unwrap().lamports;
 
-    move_clock_forward(litesvm, hours(2));
+    world.warp(hours(2));
 
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce).signer(&sponsor).execute().assert_ok();
+    world.md().step("The sponsor revokes the expired delegation");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).signer(&sponsor).instruction();
+    world.send_ok(&[ix], &[&sponsor], "RevokeDelegation (by sponsor)");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
     assert!(sponsor_balance_after >= sponsor_balance_before + delegation_rent - 10000);
 }
 
 #[test]
 fn sponsor_can_revoke_expired_recurring_delegation() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "A sponsor can revoke an expired recurring delegation",
+        "once the recurring delegation has expired past the drift window, the sponsor recovers its rent",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
-    let expiry_ts = current_ts() + days(2) as i64;
+    let start_ts = world.now();
+    let expiry_ts = world.now() + days(2) as i64;
 
-    let (res, delegation_pda) = CreateDelegation::new(litesvm, delegator, mint, delegatee)
+    world.md().step("Alice creates a sponsor-funded recurring delegation");
+    let (ix, delegation_pda) = CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee)
         .payer(&sponsor)
         .nonce(nonce)
-        .recurring(100, days(1), current_ts(), expiry_ts);
-    res.assert_ok();
+        .recurring_ix(100, days(1), start_ts, expiry_ts);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateRecurringDelegation (sponsored)");
 
-    let delegation_rent = litesvm.get_account(&delegation_pda).unwrap().lamports;
+    let delegation_rent = world.svm().get_account(&delegation_pda).unwrap().lamports;
 
-    move_clock_forward(litesvm, days(3));
+    world.warp(days(3));
 
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce).signer(&sponsor).execute().assert_ok();
+    world.md().step("The sponsor revokes the expired delegation");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).signer(&sponsor).instruction();
+    world.send_ok(&[ix], &[&sponsor], "RevokeDelegation (by sponsor)");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
     assert!(sponsor_balance_after >= sponsor_balance_before + delegation_rent - 10000);
 }
 
 #[test]
 fn sponsor_cannot_revoke_non_expired_fixed_delegation() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "A sponsor cannot revoke a non-expired fixed delegation",
+        "while the fixed delegation is live, only the delegator may revoke it",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
-    let expiry_ts = current_ts() + hours(2) as i64;
+    let expiry_ts = world.now() + hours(2) as i64;
 
-    let (res, _) =
-        CreateDelegation::new(litesvm, delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed(100, expiry_ts);
-    res.assert_ok();
+    world.md().step("Alice creates a sponsor-funded fixed delegation");
+    let (ix, _) =
+        CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed_ix(100, expiry_ts);
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateFixedDelegation (sponsored)");
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce)
-        .signer(&sponsor)
-        .execute()
-        .assert_err(SubscriptionsError::Unauthorized);
+    world.md().step("The sponsor tries to revoke before expiry");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).signer(&sponsor).instruction();
+    world.send_err(&[ix], &[&sponsor], "RevokeDelegation (by sponsor, premature)", SubscriptionsError::Unauthorized);
 }
 
 #[test]
 fn sponsor_cannot_revoke_non_expired_recurring_delegation() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "A sponsor cannot revoke a non-expired recurring delegation",
+        "while the recurring delegation is live, only the delegator may revoke it",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
-    let expiry_ts = current_ts() + days(2) as i64;
+    let start_ts = world.now();
+    let expiry_ts = world.now() + days(2) as i64;
 
-    let (res, _) = CreateDelegation::new(litesvm, delegator, mint, delegatee).payer(&sponsor).nonce(nonce).recurring(
+    world.md().step("Alice creates a sponsor-funded recurring delegation");
+    let (ix, _) = CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee).payer(&sponsor).nonce(nonce).recurring_ix(
         100,
         days(1),
-        current_ts(),
+        start_ts,
         expiry_ts,
     );
-    res.assert_ok();
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateRecurringDelegation (sponsored)");
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce)
-        .signer(&sponsor)
-        .execute()
-        .assert_err(SubscriptionsError::Unauthorized);
+    world.md().step("The sponsor tries to revoke before expiry");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).signer(&sponsor).instruction();
+    world.send_err(&[ix], &[&sponsor], "RevokeDelegation (by sponsor, premature)", SubscriptionsError::Unauthorized);
 }
 
 #[test]
 fn sponsor_cannot_revoke_no_expiry_delegation() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "A sponsor cannot revoke a no-expiry delegation",
+        "a delegation with no expiry never becomes sponsor-revocable, even far in the future",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
 
-    let (res, _) =
-        CreateDelegation::new(litesvm, delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed(100, 0);
-    res.assert_ok();
+    world.md().step("Alice creates a sponsor-funded delegation with no expiry");
+    let (ix, _) =
+        CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed_ix(100, 0);
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateFixedDelegation (sponsored, no expiry)");
 
-    move_clock_forward(litesvm, days(365));
+    world.warp(days(365));
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce)
-        .signer(&sponsor)
-        .execute()
-        .assert_err(SubscriptionsError::Unauthorized);
+    world.md().step("The sponsor tries to revoke a no-expiry delegation a year later");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).signer(&sponsor).instruction();
+    world.send_err(&[ix], &[&sponsor], "RevokeDelegation (by sponsor, no expiry)", SubscriptionsError::Unauthorized);
 }
 
 #[test]
 fn sponsor_cannot_revoke_within_drift_window() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "A sponsor cannot revoke within the drift window",
+        "the sponsor is held off until 120s past expiry, then allowed",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
-    let expiry_ts = current_ts() + 100;
+    let expiry_ts = world.now() + 100;
 
-    let (res, _) =
-        CreateDelegation::new(litesvm, delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed(100, expiry_ts);
-    res.assert_ok();
+    world.md().step("Alice creates a sponsor-funded fixed delegation expiring in 100s");
+    let (ix, _) =
+        CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed_ix(100, expiry_ts);
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateFixedDelegation (sponsored)");
 
     // 110s after creation: past expiry but still within 120s drift window.
-    move_clock_forward(litesvm, 110);
+    world.warp(110);
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce)
-        .signer(&sponsor)
-        .execute()
-        .assert_err(SubscriptionsError::Unauthorized);
+    world.md().step("Within the drift window, the sponsor is refused");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).signer(&sponsor).instruction();
+    world.send_err(&[ix], &[&sponsor], "RevokeDelegation (within drift window)", SubscriptionsError::Unauthorized);
 
     // Past the drift window: sponsor can revoke.
-    move_clock_forward(litesvm, 121);
+    world.warp(121);
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce).signer(&sponsor).execute().assert_ok();
+    world.md().step("Past the drift window, the sponsor can revoke");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).signer(&sponsor).instruction();
+    world.send_ok(&[ix], &[&sponsor], "RevokeDelegation (past drift window)");
 }
 
 #[test]
 fn delegator_can_revoke_sponsor_funded_before_expiry() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "The delegator can revoke a sponsor-funded delegation before expiry",
+        "the delegator revokes early and rent flows to the sponsor (the recorded payer)",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
-    let expiry_ts = current_ts() + hours(2) as i64;
+    let expiry_ts = world.now() + hours(2) as i64;
 
-    let (res, delegation_pda) =
-        CreateDelegation::new(litesvm, delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed(100, expiry_ts);
-    res.assert_ok();
+    world.md().step("Alice creates a sponsor-funded fixed delegation");
+    let (ix, delegation_pda) =
+        CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed_ix(100, expiry_ts);
+    world.prop(delegation_pda, "Delegation");
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateFixedDelegation (sponsored)");
 
-    let delegation_rent = litesvm.get_account(&delegation_pda).unwrap().lamports;
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let delegation_rent = world.svm().get_account(&delegation_pda).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce).receiver(sponsor.pubkey()).execute().assert_ok();
+    world.md().step("Alice revokes early, routing the rent to the sponsor");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce).receiver(sponsor.pubkey()).instruction();
+    world.send_ok(&[ix], &[&delegator], "RevokeDelegation (rent to sponsor)");
 
-    let account_after = litesvm.get_account(&delegation_pda);
+    let account_after = world.svm().get_account(&delegation_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
     assert!(sponsor_balance_after >= sponsor_balance_before + delegation_rent - 10000);
 }
 
 #[test]
 fn attacker_cannot_revoke_sponsor_funded_delegation() {
-    let (litesvm, user) = &mut setup();
-    let delegator = user;
-    let sponsor = init_wallet(litesvm, 10_000_000_000);
-    let attacker = init_wallet(litesvm, 10_000_000_000);
+    let mut world = World::new(
+        "An attacker cannot revoke a sponsor-funded delegation",
+        "Mallory cannot revoke even after expiry, despite naming the sponsor as receiver",
+    );
+    let delegator = world.actor("alice");
+    let sponsor = world.actor("sponsor");
+    let mallory = world.actor("mallory");
 
-    let mint = init_mint(litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(delegator.pubkey()), &[]);
-    let _user_ata = init_ata(litesvm, mint, delegator.pubkey(), 1_000_000);
+    let mint = world.usdc_mint(&delegator);
+    world.prop(mint, "USDC mint");
+    let _user_ata = world.fund_ata(mint, &delegator, 1_000_000);
 
-    initialize_subscription_authority_action(litesvm, delegator, mint).0.assert_ok();
+    world.init_authority(&delegator, mint, None).0.assert_ok();
 
     let delegatee = Pubkey::new_unique();
+    world.prop(delegatee, "delegatee");
     let nonce: u64 = 0;
-    let expiry_ts = current_ts() + hours(1) as i64;
+    let expiry_ts = world.now() + hours(1) as i64;
 
-    let (res, _) =
-        CreateDelegation::new(litesvm, delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed(100, expiry_ts);
-    res.assert_ok();
+    world.md().step("Alice creates a sponsor-funded fixed delegation");
+    let (ix, _) =
+        CreateDelegation::new(world.svm_mut(), &delegator, mint, delegatee).payer(&sponsor).nonce(nonce).fixed_ix(100, expiry_ts);
+    world.send_ok(&[ix], &[&sponsor, &delegator], "CreateFixedDelegation (sponsored)");
 
-    move_clock_forward(litesvm, hours(2));
+    world.warp(hours(2));
 
-    // Attacker passes sponsor as receiver to try to close the account
-    RevokeDelegation::new(litesvm, delegator, mint, delegatee, nonce)
-        .signer(&attacker)
+    // Mallory passes sponsor as receiver to try to close the account.
+    world.md().step("Mallory tries to revoke, naming the sponsor as receiver");
+    let ix = RevokeDelegation::new(world.svm_mut(), &delegator, mint, delegatee, nonce)
+        .signer(&mallory)
         .receiver(sponsor.pubkey())
-        .execute()
-        .assert_err(SubscriptionsError::Unauthorized);
-}
-
-#[allow(clippy::result_large_err)]
-fn revoke_delegation_action_with_pda(
-    litesvm: &mut litesvm::LiteSVM,
-    signer: &solana_keypair::Keypair,
-    delegation_pda: Pubkey,
-    _subscription_authority_pda: Pubkey,
-) -> litesvm::types::TransactionResult {
-    use solana_instruction::{AccountMeta, Instruction};
-    use solana_signer::Signer;
-
-    use crate::{
-        instructions::revoke_delegation,
-        tests::{constants::PROGRAM_ID, utils::build_and_send_transaction},
-    };
-
-    let ix = Instruction {
-        program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(signer.pubkey(), true), AccountMeta::new(delegation_pda, false)],
-        data: vec![*revoke_delegation::DISCRIMINATOR],
-    };
-
-    build_and_send_transaction(litesvm, &[signer], &signer.pubkey(), &ix)
+        .instruction();
+    world.send_err(&[ix], &[&mallory], "RevokeDelegation (by Mallory)", SubscriptionsError::Unauthorized);
 }
 
 /// Helper: spin up a sponsor-funded subscription, returning everything callers
-/// need to drive subsequent revoke-subscription tests.
+/// need to drive subsequent revoke-subscription tests. Builds the world's state
+/// through the observed sends so each staging action renders into the report.
 fn setup_sponsored_subscription(
+    world: &mut World,
     plan_end_ts: i64,
 ) -> (
-    litesvm::LiteSVM,
-    solana_keypair::Keypair, // alice (subscriber)
-    solana_keypair::Keypair, // merchant
-    solana_keypair::Keypair, // sponsor
-    Pubkey,                  // plan_pda
-    Pubkey,                  // subscription_pda
+    Keypair, // alice (subscriber)
+    Keypair, // merchant
+    Keypair, // sponsor
+    Pubkey,  // plan_pda
+    Pubkey,  // subscription_pda
 ) {
     use crate::tests::{
-        constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
-        pda::get_subscription_pda,
-        utils::{
-            init_ata, init_mint, init_wallet, initialize_subscription_authority_action, setup, CreatePlan, Subscribe,
-        },
+        pda::{get_plan_pda, get_subscription_pda},
+        utils::{CreatePlan, Subscribe},
     };
 
-    let (mut litesvm, alice) = setup();
-    let merchant = solana_keypair::Keypair::new();
-    litesvm.airdrop(&merchant.pubkey(), 10_000_000_000).unwrap();
-    let sponsor = init_wallet(&mut litesvm, 10_000_000_000);
+    let alice = world.actor("alice");
+    let merchant = world.actor("merchant");
+    let sponsor = world.actor("sponsor");
 
-    let mint = init_mint(&mut litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
-    let _alice_ata = init_ata(&mut litesvm, mint, alice.pubkey(), 100_000_000);
+    let mint = world.usdc_mint(&alice);
+    world.prop(mint, "USDC mint");
+    let _alice_ata = world.fund_ata(mint, &alice, 100_000_000);
 
-    initialize_subscription_authority_action(&mut litesvm, &alice, mint).0.assert_ok();
+    world.md().step("Stage: Alice's authority, the merchant's plan, Alice subscribed (sponsored)");
+    world.init_authority(&alice, mint, None).0.assert_ok();
 
-    let (res, plan_pda) = CreatePlan::new(&mut litesvm, &merchant, mint)
+    let plan_ix = CreatePlan::new(world.svm_mut(), &merchant, mint)
         .plan_id(1)
         .amount(50_000_000)
         .period_hours(1)
         .end_ts(plan_end_ts)
-        .execute();
-    res.assert_ok();
+        .instruction();
+    let (plan_pda, plan_bump) = get_plan_pda(&merchant.pubkey(), 1);
+    world.prop(plan_pda, "Plan");
+    world.send_ok(&[plan_ix], &[&merchant], "CreatePlan");
 
-    let (_, plan_bump) = crate::tests::pda::get_plan_pda(&merchant.pubkey(), 1);
-
-    Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint)
+    let sub_ix = Subscribe::new(world.svm_mut(), &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint)
         .payer(&sponsor)
-        .execute()
-        .assert_ok();
-
+        .instruction();
     let (subscription_pda, _) = get_subscription_pda(&plan_pda, &alice.pubkey());
-    (litesvm, alice, merchant, sponsor, plan_pda, subscription_pda)
+    world.prop(subscription_pda, "Subscription");
+    world.send_ok(&[sub_ix], &[&sponsor, &alice], "Subscribe (sponsored)");
+
+    (alice, merchant, sponsor, plan_pda, subscription_pda)
 }
 
 #[test]
 fn sponsor_revoke_subscription_when_plan_ended() {
-    let plan_end_ts = current_ts() + hours(2) as i64;
-    let (mut litesvm, _alice, _merchant, sponsor, plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    let mut world = World::new(
+        "A sponsor can revoke a subscription once the plan ended",
+        "once the plan end_ts passes, the sponsor recovers the subscription rent",
+    );
+    let plan_end_ts = world.now() + hours(2) as i64;
+    let (_alice, _merchant, sponsor, plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
-    let sub_rent = litesvm.get_account(&subscription_pda).unwrap().lamports;
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sub_rent = world.svm().get_account(&subscription_pda).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
     // Move past plan end.
-    move_clock_forward(&mut litesvm, hours(3));
+    world.warp(hours(3));
 
-    RevokeSubscription::new(&mut litesvm, &sponsor, subscription_pda, plan_pda).execute().assert_ok();
+    world.md().step("The sponsor revokes the subscription whose plan has ended");
+    let ix = RevokeSubscription::new(world.svm_mut(), &sponsor, subscription_pda, plan_pda).instruction();
+    world.send_ok(&[ix], &[&sponsor], "RevokeSubscription (plan ended)");
 
-    let account_after = litesvm.get_account(&subscription_pda);
+    let account_after = world.svm().get_account(&subscription_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
     assert!(sponsor_balance_after >= sponsor_balance_before + sub_rent - 10_000);
 }
 
 #[test]
 fn sponsor_revoke_subscription_when_plan_closed() {
-    use crate::{state::common::PlanStatus, tests::utils::DeletePlan};
+    use crate::{state::common::PlanStatus, tests::utils::{DeletePlan, UpdatePlan}};
 
-    let plan_end_ts = current_ts() + hours(2) as i64;
-    let (mut litesvm, _alice, merchant, sponsor, plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    let mut world = World::new(
+        "A sponsor can revoke a subscription once the plan is closed",
+        "after the merchant sunsets and deletes the plan, the sponsor can revoke the subscription",
+    );
+    let plan_end_ts = world.now() + hours(2) as i64;
+    let (_alice, merchant, sponsor, plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
     // Sunset, expire, and delete the plan.
-    crate::tests::utils::UpdatePlan::new(&mut litesvm, &merchant, plan_pda)
-        .status(PlanStatus::Sunset)
-        .end_ts(plan_end_ts)
-        .execute()
-        .assert_ok();
+    world.md().step("The merchant sunsets the plan");
+    let ix = UpdatePlan::new(world.svm_mut(), &merchant, plan_pda).status(PlanStatus::Sunset).end_ts(plan_end_ts).instruction();
+    world.send_ok(&[ix], &[&merchant], "UpdatePlan (sunset)");
 
-    move_clock_forward(&mut litesvm, hours(3));
+    world.warp(hours(3));
 
-    DeletePlan::new(&mut litesvm, &merchant, plan_pda).execute().assert_ok();
+    world.md().step("The merchant deletes the expired plan");
+    let ix = DeletePlan::new(world.svm_mut(), &merchant, plan_pda).instruction();
+    world.send_ok(&[ix], &[&merchant], "DeletePlan");
 
     // Plan account is now system-owned (closed). Sponsor can revoke.
-    RevokeSubscription::new(&mut litesvm, &sponsor, subscription_pda, plan_pda).execute().assert_ok();
+    world.md().step("The sponsor revokes against the closed plan");
+    let ix = RevokeSubscription::new(world.svm_mut(), &sponsor, subscription_pda, plan_pda).instruction();
+    world.send_ok(&[ix], &[&sponsor], "RevokeSubscription (plan closed)");
 
-    let account_after = litesvm.get_account(&subscription_pda);
+    let account_after = world.svm().get_account(&subscription_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 }
 
@@ -782,155 +929,187 @@ fn sponsor_revoke_subscription_when_plan_recreated_with_different_terms() {
     // subscription is no longer pull-eligible (transfers fail via
     // `check_plan_terms`), and the sponsor should be able to recover rent
     // unilaterally even though `plan_closed` is false on the recreated PDA.
-    use crate::{state::common::PlanStatus, tests::utils::DeletePlan};
+    use crate::{state::common::PlanStatus, tests::utils::{CreatePlan, DeletePlan, UpdatePlan}};
 
-    let plan_end_ts = current_ts() + hours(2) as i64;
-    let (mut litesvm, _alice, merchant, sponsor, plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    let mut world = World::new(
+        "A sponsor can revoke against a recreated ghost plan",
+        "a plan recreated under the same id with new terms still lets the sponsor recover rent",
+    );
+    let plan_end_ts = world.now() + hours(2) as i64;
+    let (_alice, merchant, sponsor, plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
     // Sunset, expire, delete.
-    crate::tests::utils::UpdatePlan::new(&mut litesvm, &merchant, plan_pda)
-        .status(PlanStatus::Sunset)
-        .end_ts(plan_end_ts)
-        .execute()
-        .assert_ok();
+    world.md().step("The merchant sunsets the plan");
+    let ix = UpdatePlan::new(world.svm_mut(), &merchant, plan_pda).status(PlanStatus::Sunset).end_ts(plan_end_ts).instruction();
+    world.send_ok(&[ix], &[&merchant], "UpdatePlan (sunset)");
 
-    move_clock_forward(&mut litesvm, hours(3));
+    world.warp(hours(3));
 
-    DeletePlan::new(&mut litesvm, &merchant, plan_pda).execute().assert_ok();
+    world.md().step("The merchant deletes the expired plan");
+    let ix = DeletePlan::new(world.svm_mut(), &merchant, plan_pda).instruction();
+    world.send_ok(&[ix], &[&merchant], "DeletePlan");
 
     // Recreate the same plan_id with different terms (ghost plan). End_ts
     // is in the future so neither plan_ended nor plan_closed would fire.
-    let new_end_ts = current_ts() + days(60) as i64;
+    let new_end_ts = world.now() + days(60) as i64;
     let mint = init_mint(
-        &mut litesvm,
+        world.svm_mut(),
         crate::tests::constants::TOKEN_PROGRAM_ID,
         crate::tests::constants::MINT_DECIMALS,
         1_000_000_000,
         None,
         &[],
     );
-    let (res, recreated_plan_pda) = crate::tests::utils::CreatePlan::new(&mut litesvm, &merchant, mint)
+    world.md().step("The merchant recreates the plan with different terms (a ghost plan)");
+    let plan_ix = CreatePlan::new(world.svm_mut(), &merchant, mint)
         .plan_id(1)
         .amount(999_000_000)
         .period_hours(720)
         .end_ts(new_end_ts)
-        .execute();
-    res.assert_ok();
-    assert_eq!(recreated_plan_pda, plan_pda);
+        .instruction();
+    let recreated_plan_pda = crate::tests::pda::get_plan_pda(&merchant.pubkey(), 1).0;
+    world.send_ok(&[plan_ix], &[&merchant], "CreatePlan (recreated)");
+    world.md().check("the recreated plan reuses the same PDA", plan_pda, recreated_plan_pda);
 
-    let sub_rent = litesvm.get_account(&subscription_pda).unwrap().lamports;
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sub_rent = world.svm().get_account(&subscription_pda).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
-    RevokeSubscription::new(&mut litesvm, &sponsor, subscription_pda, plan_pda).execute().assert_ok();
+    world.md().step("The sponsor revokes against the ghost plan");
+    let ix = RevokeSubscription::new(world.svm_mut(), &sponsor, subscription_pda, plan_pda).instruction();
+    world.send_ok(&[ix], &[&sponsor], "RevokeSubscription (ghost plan)");
 
-    let account_after = litesvm.get_account(&subscription_pda);
+    let account_after = world.svm().get_account(&subscription_pda);
     assert!(account_after.is_none() || account_after.as_ref().map(|a| a.lamports).unwrap_or(0) == 0);
 
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
     assert!(sponsor_balance_after >= sponsor_balance_before + sub_rent - 10_000);
 }
 
 #[test]
 fn sponsor_revoke_subscription_when_cancelled_and_expired() {
-    let plan_end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, _merchant, sponsor, plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    let mut world = World::new(
+        "A sponsor can revoke a cancelled, expired subscription",
+        "after the subscriber cancels and the period ends, the sponsor recovers the rent",
+    );
+    let plan_end_ts = world.now() + days(30) as i64;
+    let (alice, _merchant, sponsor, plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
     // Subscriber cancels.
-    CancelSubscription::new(&mut litesvm, &alice, plan_pda, subscription_pda).execute().assert_ok();
+    world.md().step("Alice cancels the subscription");
+    let ix = CancelSubscription::new(world.svm_mut(), &alice, plan_pda, subscription_pda).instruction();
+    world.send_ok(&[ix], &[&alice], "CancelSubscription");
 
     // Wait for the cancellation period to end.
-    move_clock_forward(&mut litesvm, hours(2));
+    world.warp(hours(2));
 
-    let sub_rent = litesvm.get_account(&subscription_pda).unwrap().lamports;
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sub_rent = world.svm().get_account(&subscription_pda).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
-    RevokeSubscription::new(&mut litesvm, &sponsor, subscription_pda, plan_pda).execute().assert_ok();
+    world.md().step("The sponsor revokes the cancelled subscription");
+    let ix = RevokeSubscription::new(world.svm_mut(), &sponsor, subscription_pda, plan_pda).instruction();
+    world.send_ok(&[ix], &[&sponsor], "RevokeSubscription (cancelled and expired)");
 
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
     assert!(sponsor_balance_after >= sponsor_balance_before + sub_rent - 10_000);
 }
 
 #[test]
 fn sponsor_revoke_active_subscription_rejected() {
-    let plan_end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, _alice, _merchant, sponsor, plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    let mut world = World::new(
+        "A sponsor cannot revoke an active subscription",
+        "while the plan is active and the subscription is not cancelled, the sponsor cannot revoke",
+    );
+    let plan_end_ts = world.now() + days(30) as i64;
+    let (_alice, _merchant, sponsor, plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
     // Plan still active, subscription not cancelled. Sponsor cannot revoke.
-    RevokeSubscription::new(&mut litesvm, &sponsor, subscription_pda, plan_pda)
-        .execute()
-        .assert_err(SubscriptionsError::Unauthorized);
+    world.md().step("The sponsor tries to revoke an active subscription");
+    let ix = RevokeSubscription::new(world.svm_mut(), &sponsor, subscription_pda, plan_pda).instruction();
+    world.send_err(&[ix], &[&sponsor], "RevokeSubscription (active)", SubscriptionsError::Unauthorized);
 }
 
 #[test]
 fn sponsor_revoke_subscription_with_wrong_plan_pda_rejected() {
-    let plan_end_ts = current_ts() + hours(2) as i64;
-    let (mut litesvm, _alice, merchant, sponsor, _plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    use crate::tests::utils::CreatePlan;
+
+    let mut world = World::new(
+        "A sponsor cannot revoke with the wrong plan PDA",
+        "pointing revoke at an unrelated plan is rejected as a subscription/plan mismatch",
+    );
+    let plan_end_ts = world.now() + hours(2) as i64;
+    let (_alice, merchant, sponsor, _plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
     // Create a second, unrelated plan.
     let mint = init_mint(
-        &mut litesvm,
+        world.svm_mut(),
         crate::tests::constants::TOKEN_PROGRAM_ID,
         crate::tests::constants::MINT_DECIMALS,
         1_000_000_000,
         None,
         &[],
     );
-    let other_plan_end = current_ts() + days(60) as i64;
-    let (res, other_plan_pda) = crate::tests::utils::CreatePlan::new(&mut litesvm, &merchant, mint)
+    let other_plan_end = world.now() + days(60) as i64;
+    world.md().step("The merchant creates a second, unrelated plan");
+    let other_plan_ix = CreatePlan::new(world.svm_mut(), &merchant, mint)
         .plan_id(99)
         .amount(1_000)
         .period_hours(24)
         .end_ts(other_plan_end)
-        .execute();
-    res.assert_ok();
+        .instruction();
+    let other_plan_pda = crate::tests::pda::get_plan_pda(&merchant.pubkey(), 99).0;
+    world.prop(other_plan_pda, "Other plan");
+    world.send_ok(&[other_plan_ix], &[&merchant], "CreatePlan (unrelated)");
 
-    move_clock_forward(&mut litesvm, hours(3));
+    world.warp(hours(3));
 
-    RevokeSubscription::new(&mut litesvm, &sponsor, subscription_pda, other_plan_pda)
-        .execute()
-        .assert_err(SubscriptionsError::SubscriptionPlanMismatch);
+    world.md().step("The sponsor revokes against the wrong plan PDA");
+    let ix = RevokeSubscription::new(world.svm_mut(), &sponsor, subscription_pda, other_plan_pda).instruction();
+    world.send_err(&[ix], &[&sponsor], "RevokeSubscription (wrong plan)", SubscriptionsError::SubscriptionPlanMismatch);
 }
 
 #[test]
 fn attacker_cannot_revoke_sponsor_funded_subscription() {
-    let plan_end_ts = current_ts() + hours(2) as i64;
-    let (mut litesvm, _alice, _merchant, _sponsor, plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    let mut world = World::new(
+        "An attacker cannot revoke a sponsor-funded subscription",
+        "Mallory cannot revoke even after the plan expires; she is neither delegator nor payer",
+    );
+    let plan_end_ts = world.now() + hours(2) as i64;
+    let (_alice, _merchant, _sponsor, plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
-    let attacker = init_wallet(&mut litesvm, 10_000_000_000);
+    let mallory = world.actor("mallory");
 
     // Even after the plan expires, an attacker (not delegator and not payer)
     // must not be able to revoke.
-    move_clock_forward(&mut litesvm, hours(3));
+    world.warp(hours(3));
 
-    RevokeSubscription::new(&mut litesvm, &attacker, subscription_pda, plan_pda)
-        .execute()
-        .assert_err(SubscriptionsError::Unauthorized);
+    world.md().step("Mallory tries to revoke the sponsor-funded subscription");
+    let ix = RevokeSubscription::new(world.svm_mut(), &mallory, subscription_pda, plan_pda).instruction();
+    world.send_err(&[ix], &[&mallory], "RevokeSubscription (by Mallory)", SubscriptionsError::Unauthorized);
 }
 
 #[test]
 fn subscriber_revoke_routes_rent_to_sponsor() {
-    let plan_end_ts = current_ts() + days(30) as i64;
-    let (mut litesvm, alice, _merchant, sponsor, plan_pda, subscription_pda) =
-        setup_sponsored_subscription(plan_end_ts);
+    let mut world = World::new(
+        "A subscriber revoke routes rent to the sponsor",
+        "when the subscriber revokes, the rent flows to the recorded payer (the sponsor)",
+    );
+    let plan_end_ts = world.now() + days(30) as i64;
+    let (alice, _merchant, sponsor, plan_pda, subscription_pda) = setup_sponsored_subscription(&mut world, plan_end_ts);
 
     // Subscriber cancels and waits.
-    CancelSubscription::new(&mut litesvm, &alice, plan_pda, subscription_pda).execute().assert_ok();
-    move_clock_forward(&mut litesvm, hours(2));
+    world.md().step("Alice cancels the subscription");
+    let ix = CancelSubscription::new(world.svm_mut(), &alice, plan_pda, subscription_pda).instruction();
+    world.send_ok(&[ix], &[&alice], "CancelSubscription");
+    world.warp(hours(2));
 
-    let sub_rent = litesvm.get_account(&subscription_pda).unwrap().lamports;
-    let sponsor_balance_before = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sub_rent = world.svm().get_account(&subscription_pda).unwrap().lamports;
+    let sponsor_balance_before = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
 
     // Subscriber revokes but receiver = sponsor (because header.payer = sponsor).
-    RevokeSubscription::new(&mut litesvm, &alice, subscription_pda, plan_pda)
-        .receiver(sponsor.pubkey())
-        .execute()
-        .assert_ok();
+    world.md().step("Alice revokes, routing the rent back to the sponsor");
+    let ix = RevokeSubscription::new(world.svm_mut(), &alice, subscription_pda, plan_pda).receiver(sponsor.pubkey()).instruction();
+    world.send_ok(&[ix], &[&alice], "RevokeSubscription (rent to sponsor)");
 
-    let sponsor_balance_after = litesvm.get_account(&sponsor.pubkey()).unwrap().lamports;
+    let sponsor_balance_after = world.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
     assert!(sponsor_balance_after >= sponsor_balance_before + sub_rent - 10_000);
 }

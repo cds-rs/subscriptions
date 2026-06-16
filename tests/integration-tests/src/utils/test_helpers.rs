@@ -505,7 +505,47 @@ impl<'a> CreateDelegation<'a> {
         )
     }
 
-    fn execute(self, discriminator: u8, data: Vec<u8>) -> (TransactionResult, Pubkey) {
+    /// The `CreateFixedDelegation` instruction (and its delegation PDA), built
+    /// but not sent, so a caller can route the send through an observing backend.
+    pub fn fixed_ix(self, amount: u64, expiry_ts: i64) -> (Instruction, Pubkey) {
+        let nonce_bytes = self.nonce.to_le_bytes().to_vec();
+        let init_id = self.resolved_expected_subscription_authority_init_id();
+        self.instruction(
+            *create_fixed_delegation::DISCRIMINATOR,
+            [nonce_bytes, amount.to_le_bytes().to_vec(), expiry_ts.to_le_bytes().to_vec(), init_id.to_le_bytes().to_vec()]
+                .concat(),
+        )
+    }
+
+    /// The `CreateRecurringDelegation` instruction (and its delegation PDA),
+    /// built but not sent.
+    pub fn recurring_ix(
+        self,
+        amount_per_period: u64,
+        period_length_s: u64,
+        start_ts: i64,
+        expiry_ts: i64,
+    ) -> (Instruction, Pubkey) {
+        let nonce_bytes = self.nonce.to_le_bytes().to_vec();
+        let init_id = self.resolved_expected_subscription_authority_init_id();
+        self.instruction(
+            *create_recurring_delegation::DISCRIMINATOR,
+            [
+                nonce_bytes,
+                amount_per_period.to_le_bytes().to_vec(),
+                period_length_s.to_le_bytes().to_vec(),
+                start_ts.to_le_bytes().to_vec(),
+                expiry_ts.to_le_bytes().to_vec(),
+                init_id.to_le_bytes().to_vec(),
+            ]
+            .concat(),
+        )
+    }
+
+    /// Construct the create-delegation instruction (the optional sponsor payer is
+    /// appended as a writable signer account; the caller supplies the matching
+    /// signer, sponsor first, when one pays).
+    fn build_ix(&self, discriminator: u8, data: Vec<u8>) -> (Instruction, Pubkey) {
         let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.delegator.pubkey(), &self.mint);
         let (derived_pda, _) =
             get_delegation_pda(&subscription_authority_pda, &self.delegator.pubkey(), &self.delegatee, self.nonce);
@@ -518,18 +558,26 @@ impl<'a> CreateDelegation<'a> {
             AccountMeta::new_readonly(self.delegatee, false),
             AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
         ];
-
-        let mut signers = vec![self.delegator];
-        let mut fee_payer = self.delegator.pubkey();
-
         if let Some(p) = self.payer {
             accounts.push(AccountMeta::new(p.pubkey(), true));
-            signers.push(p);
-            fee_payer = p.pubkey();
         }
 
         let ix = Instruction { program_id: PROGRAM_ID, accounts, data: [vec![discriminator], data].concat() };
+        (ix, delegation_pda)
+    }
 
+    fn instruction(self, discriminator: u8, data: Vec<u8>) -> (Instruction, Pubkey) {
+        self.build_ix(discriminator, data)
+    }
+
+    fn execute(self, discriminator: u8, data: Vec<u8>) -> (TransactionResult, Pubkey) {
+        let (ix, delegation_pda) = self.build_ix(discriminator, data);
+        let mut signers = vec![self.delegator];
+        let mut fee_payer = self.delegator.pubkey();
+        if let Some(p) = self.payer {
+            signers.push(p);
+            fee_payer = p.pubkey();
+        }
         (build_and_send_transaction(self.litesvm, &signers, &fee_payer, &ix), delegation_pda)
     }
 }
@@ -597,8 +645,18 @@ impl<'a> TransferDelegation<'a> {
         self.execute(*transfer_recurring_delegation::DISCRIMINATOR)
     }
 
-    #[allow(clippy::result_large_err)]
-    fn execute(self, discriminator: u8) -> TransactionResult {
+    /// The `TransferFixed` instruction, built but not sent. The caller supplies
+    /// the signer (the delegatee) when routing through an observing backend.
+    pub fn fixed_ix(self) -> Instruction {
+        self.instruction(*transfer_fixed_delegation::DISCRIMINATOR)
+    }
+
+    /// The `TransferRecurring` instruction, built but not sent.
+    pub fn recurring_ix(self) -> Instruction {
+        self.instruction(*transfer_recurring_delegation::DISCRIMINATOR)
+    }
+
+    fn build_ix(&self, discriminator: u8) -> Instruction {
         let token_program = self.litesvm.get_account(&self.mint).unwrap().owner;
         let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.delegator, &self.mint);
         let delegator_ata = self.source.unwrap_or_else(|| {
@@ -623,9 +681,9 @@ impl<'a> TransferDelegation<'a> {
             AccountMeta::new_readonly(event_authority, false),
             AccountMeta::new_readonly(PROGRAM_ID, false),
         ];
-        accounts.extend(self.remaining);
+        accounts.extend(self.remaining.clone());
 
-        let ix = Instruction {
+        Instruction {
             program_id: PROGRAM_ID,
             accounts,
             data: [
@@ -635,8 +693,16 @@ impl<'a> TransferDelegation<'a> {
                 self.mint.to_bytes().to_vec(),
             ]
             .concat(),
-        };
+        }
+    }
 
+    fn instruction(self, discriminator: u8) -> Instruction {
+        self.build_ix(discriminator)
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn execute(self, discriminator: u8) -> TransactionResult {
+        let ix = self.build_ix(discriminator);
         build_and_send_transaction(self.litesvm, &[self.signer], &self.signer.pubkey(), &ix)
     }
 }
@@ -672,23 +738,26 @@ impl<'a> RevokeDelegation<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `RevokeDelegation` instruction, built but not sent. The signing
+    /// authority is the explicit `.signer()` or the delegator by default.
+    pub fn instruction(&self) -> Instruction {
         let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.delegator.pubkey(), &self.mint);
         let (derived_pda, _) =
             get_delegation_pda(&subscription_authority_pda, &self.delegator.pubkey(), &self.delegatee, self.nonce);
         let delegation_pda = self.custom_pda.unwrap_or(derived_pda);
-
         let authority = self.signer.unwrap_or(self.delegator);
 
         let mut accounts = vec![AccountMeta::new(authority.pubkey(), true), AccountMeta::new(delegation_pda, false)];
-
         if let Some(r) = self.receiver {
             accounts.push(AccountMeta::new(r, false));
         }
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_delegation::DISCRIMINATOR] }
+    }
 
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_delegation::DISCRIMINATOR] };
-
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let authority = self.signer.unwrap_or(self.delegator);
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[authority], &authority.pubkey(), &ix)
     }
 }
@@ -716,21 +785,22 @@ impl<'a> CloseSubscriptionAuthority<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `CloseSubscriptionAuthority` instruction, built but not sent.
+    pub fn instruction(&self) -> Instruction {
         let (derived_pda, _) = get_subscription_authority_pda(&self.user.pubkey(), &self.mint);
         let subscription_authority_pda = self.custom_pda.unwrap_or(derived_pda);
 
         let mut accounts =
             vec![AccountMeta::new(self.user.pubkey(), true), AccountMeta::new(subscription_authority_pda, false)];
-
         if let Some(receiver) = self.receiver {
             accounts.push(AccountMeta::new(receiver, false));
         }
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*close_subscription_authority::DISCRIMINATOR] }
+    }
 
-        let ix =
-            Instruction { program_id: PROGRAM_ID, accounts, data: vec![*close_subscription_authority::DISCRIMINATOR] };
-
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.user], &self.user.pubkey(), &ix)
     }
 }
@@ -752,8 +822,8 @@ impl<'a> RevokeSubscriptionAuthority<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `RevokeSubscriptionAuthority` instruction, built but not sent.
+    pub fn instruction(&self) -> Instruction {
         let token_program = self.litesvm.get_account(&self.mint).unwrap().owner;
         let derived_ata = get_associated_token_address_with_program_id(&self.user.pubkey(), &self.mint, &token_program);
         let user_ata = self.custom_ata.unwrap_or(derived_ata);
@@ -764,10 +834,12 @@ impl<'a> RevokeSubscriptionAuthority<'a> {
             AccountMeta::new_readonly(self.mint, false),
             AccountMeta::new_readonly(token_program, false),
         ];
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_subscription_authority::DISCRIMINATOR] }
+    }
 
-        let ix =
-            Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_subscription_authority::DISCRIMINATOR] };
-
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.user], &self.user.pubkey(), &ix)
     }
 }
@@ -809,8 +881,8 @@ impl<'a> RevokeAbandonedDelegation<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `RevokeAbandonedDelegation` instruction, built but not sent.
+    pub fn instruction(&self) -> Instruction {
         let (derived_authority, _) = get_subscription_authority_pda(&self.delegator, &self.mint);
         let subscription_authority_pda = self.custom_authority.unwrap_or(derived_authority);
         let (derived_pda, _) = get_delegation_pda(&derived_authority, &self.delegator, &self.delegatee, self.nonce);
@@ -821,10 +893,12 @@ impl<'a> RevokeAbandonedDelegation<'a> {
             AccountMeta::new(delegation_pda, false),
             AccountMeta::new_readonly(subscription_authority_pda, false),
         ];
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_abandoned_delegation::DISCRIMINATOR] }
+    }
 
-        let ix =
-            Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_abandoned_delegation::DISCRIMINATOR] };
-
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.payer], &self.payer.pubkey(), &ix)
     }
 }
@@ -901,27 +975,33 @@ impl<'a> CreatePlan<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(mut self) -> (TransactionResult, Pubkey) {
-        let (derived_pda, _) = get_plan_pda(&self.owner.pubkey(), self.data.plan_id);
-        let plan_pda = self.custom_pda.unwrap_or(derived_pda);
+    /// The plan PDA this builder targets (custom override or derived).
+    pub fn plan_pda(&self) -> Pubkey {
+        self.custom_pda.unwrap_or_else(|| get_plan_pda(&self.owner.pubkey(), self.data.plan_id).0)
+    }
+
+    /// Construct the `CreatePlan` instruction without sending it, so callers that
+    /// want to route the send through an observing backend can reuse the exact
+    /// serialization (the raw `PlanData` layout) the suite relies on.
+    pub fn instruction(&self) -> Instruction {
+        let mut plan = self.data.clone();
 
         assert!(self.destinations_vec.len() <= MAX_DESTINATIONS, "max {MAX_DESTINATIONS} destinations");
         let mut destinations = [[0u8; 32]; MAX_DESTINATIONS];
         for (i, d) in self.destinations_vec.iter().enumerate() {
             destinations[i] = d.to_bytes();
         }
-        self.data.destinations = destinations.map(|d| d.into());
+        plan.destinations = destinations.map(|d| d.into());
 
         assert!(self.pullers_vec.len() <= MAX_PULLERS, "max {MAX_PULLERS} pullers");
         let mut pullers = [[0u8; 32]; MAX_PULLERS];
         for (i, p) in self.pullers_vec.iter().enumerate() {
             pullers[i] = p.to_bytes();
         }
-        self.data.pullers = pullers.map(|p| p.into());
+        plan.pullers = pullers.map(|p| p.into());
 
         let plan_data_bytes =
-            unsafe { std::slice::from_raw_parts(&self.data as *const PlanData as *const u8, PlanData::LEN) };
+            unsafe { std::slice::from_raw_parts(&plan as *const PlanData as *const u8, PlanData::LEN) };
 
         let mut data = vec![*create_plan::DISCRIMINATOR];
         data.extend_from_slice(plan_data_bytes);
@@ -935,14 +1015,19 @@ impl<'a> CreatePlan<'a> {
 
         let accounts = vec![
             AccountMeta::new(self.owner.pubkey(), true),
-            AccountMeta::new(plan_pda, false),
+            AccountMeta::new(self.plan_pda(), false),
             AccountMeta::new_readonly(mint_pubkey, false),
             AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
             AccountMeta::new_readonly(token_program, false),
         ];
 
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data };
+        Instruction { program_id: PROGRAM_ID, accounts, data }
+    }
 
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> (TransactionResult, Pubkey) {
+        let ix = self.instruction();
+        let plan_pda = self.plan_pda();
         (build_and_send_transaction(self.litesvm, &[self.owner], &self.owner.pubkey(), &ix), plan_pda)
     }
 }
@@ -1000,26 +1085,32 @@ impl<'a> UpdatePlan<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(mut self) -> TransactionResult {
+    /// Construct the `UpdatePlan` instruction without sending it (see
+    /// [`CreatePlan::instruction`] for why this split exists).
+    pub fn instruction(&self) -> Instruction {
+        let mut update = self.data.clone();
+
         assert!(self.pullers_vec.len() <= MAX_PULLERS, "max {MAX_PULLERS} pullers");
         let mut pullers = [[0u8; 32]; MAX_PULLERS];
         for (i, p) in self.pullers_vec.iter().enumerate() {
             pullers[i] = p.to_bytes();
         }
-        self.data.pullers = pullers.map(|p| p.into());
+        update.pullers = pullers.map(|p| p.into());
 
-        let data_bytes = unsafe {
-            std::slice::from_raw_parts(&self.data as *const UpdatePlanData as *const u8, UpdatePlanData::LEN)
-        };
+        let data_bytes =
+            unsafe { std::slice::from_raw_parts(&update as *const UpdatePlanData as *const u8, UpdatePlanData::LEN) };
 
         let mut data = vec![*update_plan::DISCRIMINATOR];
         data.extend_from_slice(data_bytes);
 
         let accounts = vec![AccountMeta::new(self.owner.pubkey(), true), AccountMeta::new(self.plan_pda, false)];
 
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data };
+        Instruction { program_id: PROGRAM_ID, accounts, data }
+    }
 
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.owner], &self.owner.pubkey(), &ix)
     }
 }
@@ -1035,12 +1126,15 @@ impl<'a> DeletePlan<'a> {
         Self { litesvm, owner, plan_pda }
     }
 
+    /// The `DeletePlan` instruction, built but not sent.
+    pub fn instruction(&self) -> Instruction {
+        let accounts = vec![AccountMeta::new(self.owner.pubkey(), true), AccountMeta::new(self.plan_pda, false)];
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*delete_plan::DISCRIMINATOR] }
+    }
+
     #[allow(clippy::result_large_err)]
     pub fn execute(self) -> TransactionResult {
-        let accounts = vec![AccountMeta::new(self.owner.pubkey(), true), AccountMeta::new(self.plan_pda, false)];
-
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data: vec![*delete_plan::DISCRIMINATOR] };
-
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.owner], &self.owner.pubkey(), &ix)
     }
 }
@@ -1173,8 +1267,8 @@ impl<'a> TransferSubscription<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `TransferSubscription` instruction, built but not sent.
+    pub fn instruction(&self) -> Instruction {
         let token_program = self.litesvm.get_account(&self.mint).unwrap().owner;
         let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.delegator, &self.mint);
         let delegator_ata = get_associated_token_address_with_program_id(&self.delegator, &self.mint, &token_program);
@@ -1185,7 +1279,7 @@ impl<'a> TransferSubscription<'a> {
 
         let event_authority = Pubkey::new_from_array(event_authority_pda::ID.to_bytes());
 
-        let ix = Instruction {
+        Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(self.subscription_pda, false),
@@ -1206,8 +1300,12 @@ impl<'a> TransferSubscription<'a> {
                 self.mint.to_bytes().to_vec(),
             ]
             .concat(),
-        };
+        }
+    }
 
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.caller], &self.caller.pubkey(), &ix)
     }
 }
@@ -1241,8 +1339,15 @@ impl<'a> Subscribe<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The subscription PDA this subscribe will create.
+    pub fn subscription_pda(&self) -> Pubkey {
+        get_subscription_pda(&self.plan_pda, &self.subscriber.pubkey()).0
+    }
+
+    /// The `Subscribe` instruction, built but not sent. The optional sponsor
+    /// payer is appended as a writable signer; the caller supplies the matching
+    /// signer (sponsor first) when one pays.
+    pub fn instruction(&self) -> Instruction {
         let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.subscriber.pubkey(), &self.mint);
         let (subscription_pda, _) = get_subscription_pda(&self.plan_pda, &self.subscriber.pubkey());
 
@@ -1258,14 +1363,8 @@ impl<'a> Subscribe<'a> {
             AccountMeta::new_readonly(event_authority, false),
             AccountMeta::new_readonly(PROGRAM_ID, false),
         ];
-
-        let mut signers: Vec<&Keypair> = vec![self.subscriber];
-        let mut fee_payer = self.subscriber.pubkey();
-
         if let Some(p) = self.payer {
             accounts.push(AccountMeta::new(p.pubkey(), true));
-            signers.push(p);
-            fee_payer = p.pubkey();
         }
 
         // Snapshot live plan terms to bind subscriber consent.
@@ -1295,8 +1394,18 @@ impl<'a> Subscribe<'a> {
         ]
         .concat();
 
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data };
+        Instruction { program_id: PROGRAM_ID, accounts, data }
+    }
 
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
+        let mut signers: Vec<&Keypair> = vec![self.subscriber];
+        let mut fee_payer = self.subscriber.pubkey();
+        if let Some(p) = self.payer {
+            signers.push(p);
+            fee_payer = p.pubkey();
+        }
         build_and_send_transaction(self.litesvm, &signers, &fee_payer, &ix)
     }
 }
@@ -1313,10 +1422,9 @@ impl<'a> CancelSubscription<'a> {
         Self { litesvm, subscriber, plan_pda, subscription_pda }
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `CancelSubscription` instruction, built but not sent.
+    pub fn instruction(&self) -> Instruction {
         let event_authority = Pubkey::new_from_array(event_authority_pda::ID.to_bytes());
-
         let accounts = vec![
             AccountMeta::new_readonly(self.subscriber.pubkey(), true),
             AccountMeta::new_readonly(self.plan_pda, false),
@@ -1324,9 +1432,12 @@ impl<'a> CancelSubscription<'a> {
             AccountMeta::new_readonly(event_authority, false),
             AccountMeta::new_readonly(PROGRAM_ID, false),
         ];
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*cancel_subscription::DISCRIMINATOR] }
+    }
 
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data: vec![*cancel_subscription::DISCRIMINATOR] };
-
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.subscriber], &self.subscriber.pubkey(), &ix)
     }
 }
@@ -1343,10 +1454,9 @@ impl<'a> ResumeSubscription<'a> {
         Self { litesvm, subscriber, plan_pda, subscription_pda }
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `ResumeSubscription` instruction, built but not sent.
+    pub fn instruction(&self) -> Instruction {
         let event_authority = Pubkey::new_from_array(event_authority_pda::ID.to_bytes());
-
         let accounts = vec![
             AccountMeta::new_readonly(self.subscriber.pubkey(), true),
             AccountMeta::new_readonly(self.plan_pda, false),
@@ -1354,9 +1464,12 @@ impl<'a> ResumeSubscription<'a> {
             AccountMeta::new_readonly(event_authority, false),
             AccountMeta::new_readonly(PROGRAM_ID, false),
         ];
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*resume_subscription::DISCRIMINATOR] }
+    }
 
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data: vec![*resume_subscription::DISCRIMINATOR] };
-
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.subscriber], &self.subscriber.pubkey(), &ix)
     }
 }
@@ -1420,20 +1533,24 @@ impl<'a> RevokeSubscription<'a> {
         self
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+    /// The `RevokeSubscription` instruction, built but not sent. (It shares the
+    /// `revoke_delegation` discriminator; the program dispatches on the account
+    /// shape.)
+    pub fn instruction(&self) -> Instruction {
         let mut accounts = vec![
             AccountMeta::new(self.authority.pubkey(), true),
             AccountMeta::new(self.subscription_pda, false),
             AccountMeta::new_readonly(self.plan_pda, false),
         ];
-
         if let Some(receiver) = self.receiver {
             accounts.push(AccountMeta::new(receiver, false));
         }
+        Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_delegation::DISCRIMINATOR] }
+    }
 
-        let ix = Instruction { program_id: PROGRAM_ID, accounts, data: vec![*revoke_delegation::DISCRIMINATOR] };
-
+    #[allow(clippy::result_large_err)]
+    pub fn execute(self) -> TransactionResult {
+        let ix = self.instruction();
         build_and_send_transaction(self.litesvm, &[self.authority], &self.authority.pubkey(), &ix)
     }
 }

@@ -7,6 +7,7 @@ pub mod tests {
 
     pub mod utils {
         pub use crate::utils::test_helpers::*;
+        pub use crate::utils::world::{as_pubkey, ObservedResultExt, StagedSubscription, World};
     }
 }
 

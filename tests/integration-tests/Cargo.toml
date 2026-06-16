@@ -17,10 +17,13 @@ pinocchio-token = { workspace = true }
 pinocchio-token-2022 = { workspace = true }
 litesvm = "^0.12"
 litesvm-token = { version = "^0.12", features = ["token-2022"] }
+# The anchor-litesvm observability foundation (anchor-free line). Local path for
+# now; repoint to `git = cds-rs/anchor-litesvm, branch = turbin3` once promoted.
+litesvm-utils = { path = "/Users/amal/oss/upstream/anchor-litesvm/crates/litesvm-utils" }
 solana-account = "~3.4"
 solana-clock = "^3"
 solana-instruction = "^3"
-solana-keypair = "=3.1.0"
+solana-keypair = "3.1"
 solana-message = "^3.1"
 solana-native-token = "^3"
 solana-program-pack = "^3"
