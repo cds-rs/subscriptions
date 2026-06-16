@@ -66,8 +66,10 @@ pub fn process(accounts: &mut [AccountView], transfer_data: &TransferData) -> Pr
         check_and_update_version(&mut binding)?;
         let subscription = SubscriptionDelegation::load_mut(&mut binding)?;
 
-        subscription.check_plan_terms(&plan_terms)?;
-
+        // AUDIT FINDING 3.1.2 / 3.1.4 (Cantina, High): the check_plan_terms guard
+        // (PR4) is removed here, so a recreated ghost plan (inflated per-period
+        // amount, or an extended end_ts) is no longer detected against the terms
+        // the subscriber originally consented to.
         let delegator = subscription.header.delegator;
 
         if subscription.header.delegatee != *accounts_struct.plan_pda.address() {
@@ -84,7 +86,8 @@ pub fn process(accounts: &mut [AccountView], transfer_data: &TransferData) -> Pr
             return Err(SubscriptionsError::SubscriptionCancelled.into());
         }
 
-        amount_per_period = subscription.terms.amount;
+        // AUDIT FINDING 3.1.2: read the LIVE plan amount, not the consented snapshot.
+        amount_per_period = plan_terms.amount;
         period_length_s = subscription.terms.period_length_secs();
 
         let mut ps = subscription.current_period_start_ts;

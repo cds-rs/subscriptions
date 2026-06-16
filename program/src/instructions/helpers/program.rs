@@ -5,7 +5,7 @@ use pinocchio::{
     sysvars::{rent::Rent, Sysvar},
     AccountView, ProgramResult,
 };
-use pinocchio_system::instructions::{Allocate, Assign, CreateAccount, Transfer};
+use pinocchio_system::instructions::CreateAccount;
 
 /// Account check and lifecycle operations for accounts owned by this program.
 pub struct ProgramAccount;
@@ -33,20 +33,13 @@ impl ProgramAccountInit for ProgramAccount {
         let lamports = Rent::get()?.try_minimum_balance(space)?;
         let signer = [Signer::from(seeds)];
 
-        if account.lamports() == 0 {
-            CreateAccount { from: payer, to: account, lamports, space: space as u64, owner: &crate::ID }
-                .invoke_signed(&signer)?;
-        } else {
-            let required_lamports = lamports.saturating_sub(account.lamports());
-
-            if required_lamports > 0 {
-                Transfer { from: payer, to: account, lamports: required_lamports }.invoke()?;
-            }
-
-            Allocate { account, space: space as u64 }.invoke_signed(&signer)?;
-
-            Assign { account, owner: &crate::ID }.invoke_signed(&signer)?;
-        }
+        // AUDIT FINDING 3.1.3 (Cantina, High): reverted to the vulnerable create
+        // path. The fix (PR5) handled a pre-funded PDA by topping up the rent and
+        // Allocate/Assign-ing in place; here we always CreateAccount, which the
+        // System program rejects when an attacker has pre-funded the PDA address,
+        // permanently blocking legitimate creation.
+        CreateAccount { from: payer, to: account, lamports, space: space as u64, owner: &crate::ID }
+            .invoke_signed(&signer)?;
 
         Ok(())
     }
