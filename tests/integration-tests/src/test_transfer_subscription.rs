@@ -133,7 +133,7 @@ fn test_transfer_subscription_puller_authorized() {
     let period_hours = 1u64;
     let end_ts = world.now() + days(30) as i64;
 
-    let puller = Keypair::new();
+    let puller = world.actor("puller");
 
     let (alice, _merchant, mint, plan_pda, _, subscription_pda, _, merchant_ata) = setup_plan_and_subscription(
         &mut world,
@@ -143,9 +143,6 @@ fn test_transfer_subscription_puller_authorized() {
         vec![],
         vec![puller.pubkey()],
     );
-
-    world.svm_mut().airdrop(&puller.pubkey(), 10_000_000_000).unwrap();
-    world.prop(puller.pubkey(), "puller");
 
     let transfer_amount = 10_000_000u64;
     world.md().step("The whitelisted puller pulls 10 tokens to the merchant ATA");

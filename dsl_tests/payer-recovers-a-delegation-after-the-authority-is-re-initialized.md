@@ -1,0 +1,369 @@
+## Payer recovers a delegation after the authority is re-initialized — PASS
+
+> re-initializing the authority bumps its init_id, so the old delegation is stale and the sponsor can sweep it
+
+**InitSubscriptionAuthority: structured CPI tree**
+
+```text
+
+Transaction  signers=[alice]
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
+    ├── System [2] ✓ (no cu)
+    └── Token [2] ✓ 126cu
+Compute Units (this run): 7742
+Fee: 5000 lamports
+Legend (2):
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+```
+
+**InitSubscriptionAuthority: sequence diagram**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    participant System
+    participant Token
+    alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
+    subscriptions ->> System: unnamed
+    subscriptions ->> Token: unnamed (126cu)
+```
+
+**InitSubscriptionAuthority: sequence diagram, with lifelines**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    participant System
+    participant Token
+    alice ->>+ subscriptions: InitSubscriptionAuthority
+    subscriptions ->>+ System: unnamed
+    System -->>- subscriptions: ok
+    subscriptions ->>+ Token: unnamed
+    Token -->>- subscriptions: ok (126cu)
+    subscriptions -->>- alice: ok (7742cu)
+```
+
+**InitSubscriptionAuthority: authority graph**
+
+```mermaid
+flowchart LR
+    classDef signer fill:#d4edda,stroke:#28a745;
+    classDef program fill:#cce5ff,stroke:#007bff;
+    classDef writable fill:#fff3cd,stroke:#ffc107;
+    subscriptions[subscriptions]:::program
+    alice([alice]):::signer
+    SubAuthority[(SubAuthority)]:::writable
+    D3eW9XNC_TCA5[("D3eW9XNC…TCA5")]:::writable
+    System[System]:::program
+    Token[Token]:::program
+    alice -->|signs| subscriptions
+    subscriptions -->|writes| SubAuthority
+    subscriptions -->|writes| D3eW9XNC_TCA5
+```
+
+**InitSubscriptionAuthority: ownership graph**
+
+```mermaid
+flowchart LR
+    classDef owner fill:#cce5ff,stroke:#007bff;
+    classDef account fill:#fff3cd,stroke:#ffc107;
+    System[System]:::owner
+    alice[(alice)]:::account
+    subscriptions[subscriptions]:::owner
+    SubAuthority[(SubAuthority)]:::account
+    Token[Token]:::owner
+    D3eW9XNC_TCA5[("D3eW9XNC…TCA5")]:::account
+    System -->|owns| alice
+    subscriptions -->|owns| SubAuthority
+    Token -->|owns| D3eW9XNC_TCA5
+```
+
+### Alice (with the sponsor paying rent) creates a fixed delegation
+
+**CreateFixedDelegation: structured CPI tree**
+
+```text
+
+Transaction  signers=[sponsor, alice]
+└── subscriptions::CreateFixedDelegation [1] ✓ 5064cu  signer=[alice, sponsor]
+    └── System [2] ✓ (no cu)
+Compute Units (this run): 5064
+Fee: 10000 lamports
+Legend (3):
+  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+```
+
+**CreateFixedDelegation: sequence diagram**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    participant System
+    alice ->> subscriptions: CreateFixedDelegation (5064cu)
+    subscriptions ->> System: unnamed
+```
+
+**CreateFixedDelegation: sequence diagram, with lifelines**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    participant System
+    alice ->>+ subscriptions: CreateFixedDelegation
+    subscriptions ->>+ System: unnamed
+    System -->>- subscriptions: ok
+    subscriptions -->>- alice: ok (5064cu)
+```
+
+**CreateFixedDelegation: authority graph**
+
+```mermaid
+flowchart LR
+    classDef signer fill:#d4edda,stroke:#28a745;
+    classDef program fill:#cce5ff,stroke:#007bff;
+    classDef writable fill:#fff3cd,stroke:#ffc107;
+    subscriptions[subscriptions]:::program
+    alice([alice]):::signer
+    SubAuthority[(SubAuthority)]:::writable
+    Delegation[(Delegation)]:::writable
+    sponsor([sponsor]):::signer
+    System[System]:::program
+    alice -->|signs| subscriptions
+    sponsor -->|signs| subscriptions
+    subscriptions -->|writes| SubAuthority
+    subscriptions -->|writes| Delegation
+```
+
+**CreateFixedDelegation: ownership graph**
+
+```mermaid
+flowchart LR
+    classDef owner fill:#cce5ff,stroke:#007bff;
+    classDef account fill:#fff3cd,stroke:#ffc107;
+    System[System]:::owner
+    alice[(alice)]:::account
+    subscriptions[subscriptions]:::owner
+    SubAuthority[(SubAuthority)]:::account
+    Delegation[(Delegation)]:::account
+    sponsor[(sponsor)]:::account
+    System -->|owns| alice
+    subscriptions -->|owns| SubAuthority
+    subscriptions -->|owns| Delegation
+    System -->|owns| sponsor
+```
+
+### Alice closes her authority, then re-initializes it (bumping init_id)
+
+**CloseSubscriptionAuthority: structured CPI tree**
+
+```text
+
+Transaction  signers=[alice]
+└── subscriptions::CloseSubscriptionAuthority [1] ✓ 1832cu  signer=alice
+Compute Units (this run): 1832
+Fee: 5000 lamports
+Legend (2):
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+```
+
+**CloseSubscriptionAuthority: sequence diagram**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    alice ->> subscriptions: CloseSubscriptionAuthority (1832cu)
+```
+
+**CloseSubscriptionAuthority: sequence diagram, with lifelines**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    alice ->>+ subscriptions: CloseSubscriptionAuthority
+    subscriptions -->>- alice: ok (1832cu)
+```
+
+**CloseSubscriptionAuthority: authority graph**
+
+```mermaid
+flowchart LR
+    classDef signer fill:#d4edda,stroke:#28a745;
+    classDef program fill:#cce5ff,stroke:#007bff;
+    classDef writable fill:#fff3cd,stroke:#ffc107;
+    subscriptions[subscriptions]:::program
+    alice([alice]):::signer
+    SubAuthority[(SubAuthority)]:::writable
+    alice -->|signs| subscriptions
+    subscriptions -->|writes| SubAuthority
+```
+
+**CloseSubscriptionAuthority: ownership graph**
+
+```mermaid
+flowchart LR
+    classDef owner fill:#cce5ff,stroke:#007bff;
+    classDef account fill:#fff3cd,stroke:#ffc107;
+    System[System]:::owner
+    alice[(alice)]:::account
+    System -->|owns| alice
+```
+
+**InitSubscriptionAuthority: structured CPI tree**
+
+```text
+
+Transaction  signers=[alice]
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
+    ├── System [2] ✓ (no cu)
+    └── Token [2] ✓ 126cu
+Compute Units (this run): 7742
+Fee: 5000 lamports
+Legend (2):
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+```
+
+**InitSubscriptionAuthority: sequence diagram**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    participant System
+    participant Token
+    alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
+    subscriptions ->> System: unnamed
+    subscriptions ->> Token: unnamed (126cu)
+```
+
+**InitSubscriptionAuthority: sequence diagram, with lifelines**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant alice
+    participant subscriptions
+    participant System
+    participant Token
+    alice ->>+ subscriptions: InitSubscriptionAuthority
+    subscriptions ->>+ System: unnamed
+    System -->>- subscriptions: ok
+    subscriptions ->>+ Token: unnamed
+    Token -->>- subscriptions: ok (126cu)
+    subscriptions -->>- alice: ok (7742cu)
+```
+
+**InitSubscriptionAuthority: authority graph**
+
+```mermaid
+flowchart LR
+    classDef signer fill:#d4edda,stroke:#28a745;
+    classDef program fill:#cce5ff,stroke:#007bff;
+    classDef writable fill:#fff3cd,stroke:#ffc107;
+    subscriptions[subscriptions]:::program
+    alice([alice]):::signer
+    SubAuthority[(SubAuthority)]:::writable
+    D3eW9XNC_TCA5[("D3eW9XNC…TCA5")]:::writable
+    System[System]:::program
+    Token[Token]:::program
+    alice -->|signs| subscriptions
+    subscriptions -->|writes| SubAuthority
+    subscriptions -->|writes| D3eW9XNC_TCA5
+```
+
+**InitSubscriptionAuthority: ownership graph**
+
+```mermaid
+flowchart LR
+    classDef owner fill:#cce5ff,stroke:#007bff;
+    classDef account fill:#fff3cd,stroke:#ffc107;
+    System[System]:::owner
+    alice[(alice)]:::account
+    subscriptions[subscriptions]:::owner
+    SubAuthority[(SubAuthority)]:::account
+    Token[Token]:::owner
+    D3eW9XNC_TCA5[("D3eW9XNC…TCA5")]:::account
+    System -->|owns| alice
+    subscriptions -->|owns| SubAuthority
+    Token -->|owns| D3eW9XNC_TCA5
+```
+
+### The sponsor sweeps the now-stale delegation
+
+**RevokeAbandonedDelegation: structured CPI tree**
+
+```text
+
+Transaction  signers=[sponsor]
+└── subscriptions::RevokeAbandonedDelegation [1] ✓ 352cu  signer=sponsor
+Compute Units (this run): 352
+Fee: 5000 lamports
+Legend (2):
+  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+```
+
+**RevokeAbandonedDelegation: sequence diagram**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant sponsor
+    participant subscriptions
+    sponsor ->> subscriptions: RevokeAbandonedDelegation (352cu)
+```
+
+**RevokeAbandonedDelegation: sequence diagram, with lifelines**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant sponsor
+    participant subscriptions
+    sponsor ->>+ subscriptions: RevokeAbandonedDelegation
+    subscriptions -->>- sponsor: ok (352cu)
+```
+
+**RevokeAbandonedDelegation: authority graph**
+
+```mermaid
+flowchart LR
+    classDef signer fill:#d4edda,stroke:#28a745;
+    classDef program fill:#cce5ff,stroke:#007bff;
+    classDef writable fill:#fff3cd,stroke:#ffc107;
+    subscriptions[subscriptions]:::program
+    sponsor([sponsor]):::signer
+    Delegation[(Delegation)]:::writable
+    sponsor -->|signs| subscriptions
+    subscriptions -->|writes| Delegation
+```
+
+**RevokeAbandonedDelegation: ownership graph**
+
+```mermaid
+flowchart LR
+    classDef owner fill:#cce5ff,stroke:#007bff;
+    classDef account fill:#fff3cd,stroke:#ffc107;
+    System[System]:::owner
+    sponsor[(sponsor)]:::account
+    System -->|owns| sponsor
+```
+
+- [x] the delegation account is gone: `true`

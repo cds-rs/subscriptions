@@ -1,0 +1,16 @@
+# Route anchor-litesvm test reports to a committed, browsable folder at the
+# workspace root (dsl_tests/) instead of the throwaway target/md-reports. The
+# Report writer honors MD_REPORTS_DIR as its highest-precedence output dir;
+# `relative = true` resolves it against this config's directory (the workspace
+# root), so it holds wherever `cargo test` runs from. Setting the env var
+# explicitly overrides this (e.g. a scratch dir), since this is not `force`d.
+#
+# RUST_TEST_THREADS=1 makes the reports byte-reproducible so they commit clean.
+# Two execution-order artifacts otherwise churn them: `Pubkey::new_unique()`
+# props (a process-global counter) and the cold/warm program-JIT cost that lands
+# on whichever test runs first. A single, fixed test order pins both. The suite
+# is small, so the serial cost is negligible; override with `--test-threads` if a
+# run doesn't care about the snapshots.
+[env]
+MD_REPORTS_DIR = { value = "dsl_tests", relative = true }
+RUST_TEST_THREADS = "1"
