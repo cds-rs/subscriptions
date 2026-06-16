@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 6242
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (6242cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (6242cu)
 ```
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
@@ -108,7 +108,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3468cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan: sequence diagram, with lifelines**
@@ -120,7 +120,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3468cu)
 ```
@@ -160,8 +160,8 @@ flowchart LR
 
 Transaction  signers=[sponsor, alice]
 └── subscriptions::Subscribe [1] ✓ 6540cu  signer=[alice, sponsor]
-    ├── System [2] ✓ (no cu)
-    └── subscriptions [2] ✓ 137cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── subscriptions::EmitEvent [2] ✓ 137cu
           🔔 SubscriptionCreated
                plan:       Plan,
                subscriber: alice,
@@ -184,8 +184,8 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: Subscribe (6540cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> subscriptions: unnamed (137cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
 
 **Subscribe (sponsored): sequence diagram, with lifelines**
@@ -197,9 +197,9 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: Subscribe
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ subscriptions: unnamed
+    subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
     subscriptions -->>- alice: ok (6540cu)
 ```
@@ -245,7 +245,7 @@ flowchart LR
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 6468cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 6468
 Fee: 5000 lamports
 Legend (2):
@@ -262,7 +262,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (6468cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan (unrelated): sequence diagram, with lifelines**
@@ -274,7 +274,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (6468cu)
 ```
@@ -315,10 +315,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[sponsor]
-└── subscriptions::RevokeDelegation [1] ✗ 357cu  signer=sponsor
+└── subscriptions::RevokeDelegation [1] ✗ 363cu  signer=sponsor
     └── Error: SubscriptionPlanMismatch
 Error: InstructionError(0, Custom(505))
-Compute Units (this run): 357
+Compute Units (this run): 363
 Fee: 5000 lamports
 Legend (2):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx

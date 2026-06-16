@@ -10,7 +10,7 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 9012cu  signer=alice
-    ├── System [2] ✓ (no cu)
+    ├── System::CreateAccount [2] ✓ (no cu)
     └── Token-2022::Approve [2] ✓ 1098cu
 Compute Units (this run): 9012
 Fee: 5000 lamports
@@ -29,7 +29,7 @@ sequenceDiagram
     participant System
     participant Token_2022 as "Token-2022"
     alice ->> subscriptions: InitSubscriptionAuthority (9012cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
     subscriptions ->> Token_2022: Approve (1098cu)
 ```
 
@@ -43,7 +43,7 @@ sequenceDiagram
     participant System
     participant Token_2022 as "Token-2022"
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions ->>+ Token_2022: Approve
     Token_2022 -->>- subscriptions: ok (1098cu)
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 5038cu  signer=alice
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 5038
 Fee: 5000 lamports
 Legend (2):
@@ -108,7 +108,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: CreateFixedDelegation (5038cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreateFixedDelegation: sequence diagram, with lifelines**
@@ -120,7 +120,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: CreateFixedDelegation
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- alice: ok (5038cu)
 ```
@@ -167,7 +167,7 @@ flowchart LR
 Transaction  signers=[bob]
 └── subscriptions::TransferFixed [1] ✓ 8066cu  signer=bob
     ├── Token-2022::TransferChecked [2] ✓ 2343cu
-    └── subscriptions [2] ✓ 137cu
+    └── subscriptions::EmitEvent [2] ✓ 137cu
 Compute Units (this run): 8066
 Fee: 5000 lamports
 Legend (2):
@@ -185,7 +185,7 @@ sequenceDiagram
     participant Token_2022 as "Token-2022"
     bob ->> subscriptions: TransferFixed (8066cu)
     subscriptions ->> Token_2022: TransferChecked (2343cu)
-    subscriptions ->> subscriptions: unnamed (137cu)
+    subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
 
 **TransferFixed: sequence diagram, with lifelines**
@@ -199,7 +199,7 @@ sequenceDiagram
     bob ->>+ subscriptions: TransferFixed
     subscriptions ->>+ Token_2022: TransferChecked
     Token_2022 -->>- subscriptions: ok (2343cu)
-    subscriptions ->>+ subscriptions: unnamed
+    subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
     subscriptions -->>- bob: ok (8066cu)
 ```

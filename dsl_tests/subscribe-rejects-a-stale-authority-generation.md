@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 13742cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 13742
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (13742cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (13742cu)
 ```
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
@@ -108,7 +108,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3468cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan: sequence diagram, with lifelines**
@@ -120,7 +120,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3468cu)
 ```
@@ -221,8 +221,8 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 13742cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 13742
 Fee: 5000 lamports
 Legend (2):
@@ -240,8 +240,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (13742cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -254,9 +254,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (13742cu)
 ```
@@ -303,10 +303,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[alice]
-└── subscriptions::Subscribe [1] ✗ 2261cu  signer=alice
+└── subscriptions::Subscribe [1] ✗ 2267cu  signer=alice
     └── Error: StaleSubscriptionAuthority
 Error: InstructionError(0, Custom(136))
-Compute Units (this run): 2261
+Compute Units (this run): 2267
 Fee: 5000 lamports
 Legend (2):
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF

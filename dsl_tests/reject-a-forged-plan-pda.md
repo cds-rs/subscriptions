@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[merchant]
-└── subscriptions::CreatePlan [1] ✗ 2073cu  signer=merchant
+└── subscriptions::CreatePlan [1] ✗ 2079cu  signer=merchant
     └── Error: InvalidPlanPda
 Error: InstructionError(0, Custom(502))
-Compute Units (this run): 2073
+Compute Units (this run): 2079
 Fee: 5000 lamports
 Legend (2):
   merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq

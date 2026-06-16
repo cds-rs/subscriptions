@@ -10,7 +10,7 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 10512cu  signer=alice
-    ├── System [2] ✓ (no cu)
+    ├── System::CreateAccount [2] ✓ (no cu)
     └── Token-2022::Approve [2] ✓ 1098cu
 Compute Units (this run): 10512
 Fee: 5000 lamports
@@ -29,7 +29,7 @@ sequenceDiagram
     participant System
     participant Token_2022 as "Token-2022"
     alice ->> subscriptions: InitSubscriptionAuthority (10512cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
     subscriptions ->> Token_2022: Approve (1098cu)
 ```
 
@@ -43,7 +43,7 @@ sequenceDiagram
     participant System
     participant Token_2022 as "Token-2022"
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions ->>+ Token_2022: Approve
     Token_2022 -->>- subscriptions: ok (1098cu)

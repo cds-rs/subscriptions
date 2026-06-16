@@ -8,8 +8,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
@@ -27,8 +27,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -41,9 +41,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (7742cu)
 ```
@@ -89,7 +89,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 5038cu  signer=alice
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 5038
 Fee: 5000 lamports
 Legend (2):
@@ -106,7 +106,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: CreateFixedDelegation (5038cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreateFixedDelegation: sequence diagram, with lifelines**
@@ -118,7 +118,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: CreateFixedDelegation
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- alice: ok (5038cu)
 ```
@@ -161,10 +161,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[sponsor, alice]
-└── subscriptions::RevokeDelegation [1] ✗ 155cu  signer=alice
+└── subscriptions::RevokeDelegation [1] ✗ 161cu  signer=alice
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 155
+Compute Units (this run): 161
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
@@ -177,10 +177,10 @@ Legend (3):
 ```text
 
 Transaction  signers=[sponsor, alice]
-└── subscriptions::RevokeDelegation [1] ✗ 158cu  signer=alice
+└── subscriptions::RevokeDelegation [1] ✗ 164cu  signer=alice
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 158
+Compute Units (this run): 164
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx

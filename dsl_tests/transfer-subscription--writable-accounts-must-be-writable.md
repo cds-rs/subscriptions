@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 12242cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 12242
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (12242cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (12242cu)
 ```
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
@@ -108,7 +108,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3468cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan: sequence diagram, with lifelines**
@@ -120,7 +120,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3468cu)
 ```
@@ -159,10 +159,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[sponsor, merchant]
-└── subscriptions::TransferSubscription [1] ✗ 351cu  signer=merchant
+└── subscriptions::TransferSubscription [1] ✗ 357cu  signer=merchant
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 351
+Compute Units (this run): 357
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
@@ -175,10 +175,10 @@ Legend (3):
 ```text
 
 Transaction  signers=[sponsor, merchant]
-└── subscriptions::TransferSubscription [1] ✗ 437cu  signer=merchant
+└── subscriptions::TransferSubscription [1] ✗ 443cu  signer=merchant
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 437
+Compute Units (this run): 443
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
@@ -191,10 +191,10 @@ Legend (3):
 ```text
 
 Transaction  signers=[sponsor, merchant]
-└── subscriptions::TransferSubscription [1] ✗ 440cu  signer=merchant
+└── subscriptions::TransferSubscription [1] ✗ 446cu  signer=merchant
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 440
+Compute Units (this run): 446
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx

@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 10742cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 10742
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (10742cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (10742cu)
 ```
@@ -93,7 +93,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::CreateRecurringDelegation [1] ✓ 5063cu  signer=alice
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 5063
 Fee: 5000 lamports
 Legend (2):
@@ -110,7 +110,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: CreateRecurringDelegation (5063cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreateRecurringDelegation (sentinel start): sequence diagram, with lifelines**
@@ -122,7 +122,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: CreateRecurringDelegation
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- alice: ok (5063cu)
 ```
@@ -170,8 +170,8 @@ flowchart LR
 
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✓ 7164cu  signer=bob
-    ├── Token [2] ✓ 113cu
-    └── subscriptions [2] ✓ 137cu
+    ├── Token::TransferChecked [2] ✓ 113cu
+    └── subscriptions::EmitEvent [2] ✓ 137cu
           🔔 RecurringTransfer
                delegatee:        bob,
                amount:           10000000,
@@ -193,8 +193,8 @@ sequenceDiagram
     participant subscriptions
     participant Token
     bob ->> subscriptions: TransferRecurring (7164cu)
-    subscriptions ->> Token: unnamed (113cu)
-    subscriptions ->> subscriptions: unnamed (137cu)
+    subscriptions ->> Token: TransferChecked (113cu)
+    subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
 
 **TransferRecurring: sequence diagram, with lifelines**
@@ -206,9 +206,9 @@ sequenceDiagram
     participant subscriptions
     participant Token
     bob ->>+ subscriptions: TransferRecurring
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: TransferChecked
     Token -->>- subscriptions: ok (113cu)
-    subscriptions ->>+ subscriptions: unnamed
+    subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
     subscriptions -->>- bob: ok (7164cu)
 ```

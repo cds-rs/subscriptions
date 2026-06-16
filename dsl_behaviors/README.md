@@ -60,13 +60,13 @@ sequenceDiagram
     participant subscriptions
     participant Token
     merchant ->> subscriptions: TransferSubscription (5942cu)
-    subscriptions ->> Token: unnamed (113cu)
-    subscriptions ->> subscriptions: unnamed (137cu)
+    subscriptions ->> Token: TransferChecked (113cu)
+    subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
 
 That is the hand-drawn `alt` branch, observed: the caller invokes the program,
-the program CPIs into the token program (the `P->>T: Transfer via SA` arrow),
-and a self-CPI emits the event. The diagram even carries the compute cost the
+the program CPIs into the token program (the `P->>T: Transfer via SA` arrow, here
+the named `Token: TransferChecked`), and a self-CPI emits the event. The diagram even carries the compute cost the
 hand-drawn one could not know. The authority graph shows that same pull
 structurally, naming exactly the accounts the transfer writes:
 
@@ -103,59 +103,38 @@ so Mallory's frame fails at 946 compute units, before any token moves: there is
 no CPI into the token program at all, which is exactly what the hand-drawn
 `else` branch shows (the `P->>T` arrow is absent).
 
-## On the `unnamed` inner frames
+## On the inner frame names
 
-You will have noticed the generated sequence diagram says `unnamed` where the
-hand-drawn one says `Transfer via SA`:
+The inner CPI frames now name themselves: `System: CreateAccount`,
+`Token: TransferChecked`, `subscriptions: EmitEvent`. That was not always so, and
+the history is worth a note because it is the dogfood loop paying off.
 
-```text
-    subscriptions ->> Token: unnamed (113cu)
-    subscriptions ->> subscriptions: unnamed (137cu)
-```
+These frames used to render `unnamed`. The cause was a seam in the framework's
+multi-engine model: inner-frame name resolution was wired to litesvm's
+`inner_instructions` list, but the engine-neutral record the renderers consume
+deliberately does not carry that list (it is a litesvm-specific artifact an RPC
+or mollusk backend would not produce the same way); it carries inner *structure*
+as the `cpi_tree` frames and inner *data* as the per-frame trace. So when the
+model went engine-neutral, the naming logic stayed behind on an input that was
+empty on every backend's path. The resolver existed; it just had nothing to read.
 
-The top-level frame names itself (`TransferSubscription`); the inner CPI frames
-do not. This is worth being precise about, because it is not a property of this
-program and it is not quite a bug either: it is a seam left by an unfinished
-migration in the framework's multi-engine model, and the two unnamed frames sit
-on different sides of it.
+The fix (cds-rs/anchor-litesvm#10, landed in `turbin3` at `c45d76b`) resolves the
+name from the trace instead, with the same built-in decoders. Those decoders are
+pure functions of `(program_id, data)`, so a native-program CPI names itself with
+no per-program registration: `System: CreateAccount`, `Token: TransferChecked`,
+`Token: Approve` all fall out for free. This report regenerated against that fix
+is what you see above.
 
-The root cause is the cross-engine abstraction. Inner-frame name resolution was
-originally wired to litesvm's `inner_instructions` list. But the engine-neutral
-record the renderers consume deliberately does not carry `inner_instructions`
-(that list is a litesvm-specific artifact an RPC or mollusk backend would not
-produce the same way); it carries inner *structure* as the `cpi_tree` frames and
-inner *data* as the per-frame trace. So when the model went engine-neutral, the
-naming logic stayed behind on an input that is now empty on every backend's path.
-The resolver still exists; it just no longer has anything to read.
-
-The two unnamed frames are not equally unsettled, though:
-
-- **The `Token` frame (a native-program CPI).** Where its name belongs is
-  already clear: in the trace pass, because the trace is now the cross-engine
-  carrier of inner data, and the built-in decoders are pure functions of
-  `(program_id, data)`. This half is an incomplete migration with an obvious
-  destination, not an open question. The name `Transfer` would fall out for free
-  the moment resolution moves onto the trace, with no per-program registration.
-
-- **The `subscriptions ->> subscriptions` frame (a self-CPI event emit).** This
-  one is a genuine open design question. The program emits events as a self-CPI
-  whose data is an 8-byte event tag rather than an instruction discriminator, and
-  the framework already has *two* renderers that disagree about it: the tree
-  consults the event registry and prints `🔔 SubscriptionCreated`, while the
-  sequence renderer consults only the instruction-name table and prints
-  `unnamed`. Underneath that is a real judgment call we have not settled: should
-  a self-CPI emit even be a participant arrow in the sequence view, or should it
-  fold into the caller the way the tree's annotation does?
-
-In sum: the `unnamed` frames are a symptom of the
-`inner_instructions`-to-`trace` migration (done for multi-engine support) being
-half-finished. One half has a clear home it has not moved to yet; the other half
-is a real question about whether events are instructions in a sequence diagram at
-all. Neither touches what this mirror is *for*: the `alt` is a story about
-authorization, carried by the named top-level frame, the authority graph, and
-the refused `Unauthorized`. The unnamed frames are the token transfer and the
-event emit, identical on both branches, so the report is a faithful mirror of
-ADR-002 today and a tidier one once the native-program half lands.
+One nicety remains open (#10's second half). The `subscriptions ->> subscriptions`
+frame is the program emitting an event as a self-CPI; it now reads `EmitEvent`,
+its registered instruction name, rather than `unnamed`. But the CPI tree decodes
+that same frame further, to `🔔 SubscriptionCreated` with its fields, because it
+consults the event registry. Whether the *sequence* view should likewise name it
+by the event (`emit SubscriptionCreated`) or fold it into the caller the way the
+tree's annotation does is an unsettled rendering question, not a missing fact: the
+event is already decoded where it matters. Either way it does not touch what this
+mirror is *for* (the authorization `alt`, carried by the top-level frame, the
+authority graph, and the refused `Unauthorized`).
 
 ## Regenerating
 

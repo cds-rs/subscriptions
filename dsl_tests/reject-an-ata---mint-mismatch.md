@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (7742cu)
 ```
@@ -92,10 +92,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[alice]
-└── subscriptions::RevokeSubscriptionAuthority [1] ✗ 363cu  signer=alice
+└── subscriptions::RevokeSubscriptionAuthority [1] ✗ 369cu  signer=alice
     └── Error: MintMismatch
 Error: InstructionError(0, Custom(125))
-Compute Units (this run): 363
+Compute Units (this run): 369
 Fee: 5000 lamports
 Legend (2):
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF

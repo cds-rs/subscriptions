@@ -10,7 +10,7 @@
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3455cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3455
 Fee: 5000 lamports
 Legend (2):
@@ -27,7 +27,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3455cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan (no destinations): sequence diagram, with lifelines**
@@ -39,7 +39,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3455cu)
 ```

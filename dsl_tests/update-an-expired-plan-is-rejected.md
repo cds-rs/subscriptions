@@ -8,7 +8,7 @@
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
@@ -25,7 +25,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3468cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan: sequence diagram, with lifelines**
@@ -37,7 +37,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3468cu)
 ```
@@ -78,10 +78,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[merchant]
-└── subscriptions::UpdatePlan [1] ✗ 460cu  signer=merchant
+└── subscriptions::UpdatePlan [1] ✗ 466cu  signer=merchant
     └── Error: PlanExpired
 Error: InstructionError(0, Custom(501))
-Compute Units (this run): 460
+Compute Units (this run): 466
 Fee: 5000 lamports
 Legend (2):
   merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq

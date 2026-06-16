@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[alice]
-└── subscriptions::CreateFixedDelegation [1] ✗ 351cu  signer=alice
+└── subscriptions::CreateFixedDelegation [1] ✗ 357cu  signer=alice
     └── Error: FixedDelegationExpiryInPast
 Error: InstructionError(0, Custom(301))
-Compute Units (this run): 351
+Compute Units (this run): 357
 Fee: 5000 lamports
 Legend (2):
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF

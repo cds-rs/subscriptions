@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[merchant]
-└── subscriptions::CreatePlan [1] ✗ 369cu  signer=merchant
+└── subscriptions::CreatePlan [1] ✗ 375cu  signer=merchant
     └── Error: InvalidAmount
 Error: InstructionError(0, Custom(129))
-Compute Units (this run): 369
+Compute Units (this run): 375
 Fee: 5000 lamports
 Legend (2):
   merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq

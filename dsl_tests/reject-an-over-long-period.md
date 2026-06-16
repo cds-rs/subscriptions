@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[merchant]
-└── subscriptions::CreatePlan [1] ✗ 373cu  signer=merchant
+└── subscriptions::CreatePlan [1] ✗ 379cu  signer=merchant
     └── Error: InvalidPeriodLength
 Error: InstructionError(0, Custom(402))
-Compute Units (this run): 373
+Compute Units (this run): 379
 Fee: 5000 lamports
 Legend (2):
   merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq

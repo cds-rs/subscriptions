@@ -10,9 +10,9 @@
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 5726cu  signer=merchant
-    ├── System [2] ✓ (no cu)
-    ├── System [2] ✓ (no cu)
-    └── System [2] ✓ (no cu)
+    ├── System::Transfer [2] ✓ (no cu)
+    ├── System::Allocate [2] ✓ (no cu)
+    └── System::Assign [2] ✓ (no cu)
 Compute Units (this run): 5726
 Fee: 5000 lamports
 Legend (2):
@@ -29,9 +29,9 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (5726cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> System: unnamed
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: Transfer
+    subscriptions ->> System: Allocate
+    subscriptions ->> System: Assign
 ```
 
 **CreatePlan (pre-funded PDA): sequence diagram, with lifelines**
@@ -43,11 +43,11 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: Transfer
     System -->>- subscriptions: ok
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: Allocate
     System -->>- subscriptions: ok
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: Assign
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (5726cu)
 ```

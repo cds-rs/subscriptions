@@ -7,10 +7,10 @@
 ```text
 
 Transaction  signers=[sponsor]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 228cu
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 234cu
     └── Error: NotSigner
 Error: InstructionError(0, Custom(100))
-Compute Units (this run): 228
+Compute Units (this run): 234
 Fee: 5000 lamports
 Legend (2):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx

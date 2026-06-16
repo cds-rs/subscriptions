@@ -8,7 +8,7 @@
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3455cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3455
 Fee: 5000 lamports
 Legend (2):
@@ -25,7 +25,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3455cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan: sequence diagram, with lifelines**
@@ -37,7 +37,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3455cu)
 ```
@@ -78,10 +78,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[mallory]
-└── subscriptions::UpdatePlan [1] ✗ 233cu  signer=mallory
+└── subscriptions::UpdatePlan [1] ✗ 239cu  signer=mallory
     └── Error: NotPlanOwner
 Error: InstructionError(0, Custom(504))
-Compute Units (this run): 233
+Compute Units (this run): 239
 Fee: 5000 lamports
 Legend (2):
   mallory       = DBSEUVB8mVMJYsFGED5gtoBUxDPN2FmQKs9KPiMxXoE8

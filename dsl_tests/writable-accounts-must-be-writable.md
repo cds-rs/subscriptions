@@ -7,10 +7,10 @@
 ```text
 
 Transaction  signers=[sponsor, alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 231cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 237cu  signer=alice
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 231
+Compute Units (this run): 237
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
@@ -23,10 +23,10 @@ Legend (3):
 ```text
 
 Transaction  signers=[sponsor, alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 236cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 242cu  signer=alice
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 236
+Compute Units (this run): 242
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
@@ -39,10 +39,10 @@ Legend (3):
 ```text
 
 Transaction  signers=[sponsor, alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 239cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 245cu  signer=alice
     └── Error: AccountNotWritable
 Error: InstructionError(0, Custom(131))
-Compute Units (this run): 239
+Compute Units (this run): 245
 Fee: 10000 lamports
 Legend (3):
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx

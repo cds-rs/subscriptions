@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (7742cu)
 ```
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 5038cu  signer=alice
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 5038
 Fee: 5000 lamports
 Legend (2):
@@ -108,7 +108,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: CreateFixedDelegation (5038cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreateFixedDelegation (Bob): sequence diagram, with lifelines**
@@ -120,7 +120,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: CreateFixedDelegation
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- alice: ok (5038cu)
 ```
@@ -164,7 +164,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 3538cu  signer=alice
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3538
 Fee: 5000 lamports
 Legend (2):
@@ -181,7 +181,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: CreateFixedDelegation (3538cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreateFixedDelegation (Charlie): sequence diagram, with lifelines**
@@ -193,7 +193,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: CreateFixedDelegation
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- alice: ok (3538cu)
 ```
@@ -299,10 +299,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[bob]
-└── subscriptions::TransferFixed [1] ✗ 368cu  signer=bob
+└── subscriptions::TransferFixed [1] ✗ 374cu  signer=bob
     └── Error: InvalidSubscriptionAuthorityPda
 Error: InstructionError(0, Custom(103))
-Compute Units (this run): 368
+Compute Units (this run): 374
 Fee: 5000 lamports
 Legend (2):
   bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
@@ -314,10 +314,10 @@ Legend (2):
 ```text
 
 Transaction  signers=[charlie]
-└── subscriptions::TransferFixed [1] ✗ 368cu  signer=charlie
+└── subscriptions::TransferFixed [1] ✗ 374cu  signer=charlie
     └── Error: InvalidSubscriptionAuthorityPda
 Error: InstructionError(0, Custom(103))
-Compute Units (this run): 368
+Compute Units (this run): 374
 Fee: 5000 lamports
 Legend (2):
   charlie       = 5b3hX8Qbs7HnenmYwER2eYZNpufgoqPSq6wor4Fr5isz

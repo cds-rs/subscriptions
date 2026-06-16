@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[merchant]
-└── subscriptions::CreatePlan [1] ✗ 391cu  signer=merchant
+└── subscriptions::CreatePlan [1] ✗ 397cu  signer=merchant
     └── Error: InvalidEndTs
 Error: InstructionError(0, Custom(511))
-Compute Units (this run): 391
+Compute Units (this run): 397
 Fee: 5000 lamports
 Legend (2):
   merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq

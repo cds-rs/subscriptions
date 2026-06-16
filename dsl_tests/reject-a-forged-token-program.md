@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 272cu  signer=[alice, alice]
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 278cu  signer=[alice, alice]
     └── Error: InvalidTokenProgram
 Error: InstructionError(0, Custom(105))
-Compute Units (this run): 272
+Compute Units (this run): 278
 Fee: 5000 lamports
 Legend (2):
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF

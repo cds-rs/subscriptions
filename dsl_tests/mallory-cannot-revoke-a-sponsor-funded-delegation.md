@@ -8,8 +8,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 12242cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 12242
 Fee: 5000 lamports
 Legend (2):
@@ -27,8 +27,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (12242cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -41,9 +41,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (12242cu)
 ```
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[sponsor, alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 5066cu  signer=[alice, sponsor]
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 5066
 Fee: 10000 lamports
 Legend (3):
@@ -109,7 +109,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: CreateFixedDelegation (5066cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreateFixedDelegation (sponsored): sequence diagram, with lifelines**
@@ -121,7 +121,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: CreateFixedDelegation
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- alice: ok (5066cu)
 ```
@@ -170,10 +170,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[mallory]
-└── subscriptions::RevokeDelegation [1] ✗ 240cu  signer=mallory
+└── subscriptions::RevokeDelegation [1] ✗ 246cu  signer=mallory
     └── Error: Unauthorized
 Error: InstructionError(0, Custom(130))
-Compute Units (this run): 240
+Compute Units (this run): 246
 Fee: 5000 lamports
 Legend (2):
   mallory       = DBSEUVB8mVMJYsFGED5gtoBUxDPN2FmQKs9KPiMxXoE8

@@ -10,7 +10,7 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 9012cu  signer=alice
-    ├── System [2] ✓ (no cu)
+    ├── System::CreateAccount [2] ✓ (no cu)
     └── Token-2022::Approve [2] ✓ 1098cu
 Compute Units (this run): 9012
 Fee: 5000 lamports
@@ -29,7 +29,7 @@ sequenceDiagram
     participant System
     participant Token_2022 as "Token-2022"
     alice ->> subscriptions: InitSubscriptionAuthority (9012cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
     subscriptions ->> Token_2022: Approve (1098cu)
 ```
 
@@ -43,7 +43,7 @@ sequenceDiagram
     participant System
     participant Token_2022 as "Token-2022"
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions ->>+ Token_2022: Approve
     Token_2022 -->>- subscriptions: ok (1098cu)
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::CreateRecurringDelegation [1] ✓ 15573cu  signer=alice
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 15573
 Fee: 5000 lamports
 Legend (2):
@@ -108,7 +108,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->> subscriptions: CreateRecurringDelegation (15573cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreateRecurringDelegation: sequence diagram, with lifelines**
@@ -120,7 +120,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     alice ->>+ subscriptions: CreateRecurringDelegation
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- alice: ok (15573cu)
 ```
@@ -167,7 +167,7 @@ flowchart LR
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✓ 9675cu  signer=bob
     ├── Token-2022::TransferChecked [2] ✓ 2343cu
-    └── subscriptions [2] ✓ 137cu
+    └── subscriptions::EmitEvent [2] ✓ 137cu
           🔔 RecurringTransfer
                delegatee:        bob,
                amount:           10000000,
@@ -190,7 +190,7 @@ sequenceDiagram
     participant Token_2022 as "Token-2022"
     bob ->> subscriptions: TransferRecurring (9675cu)
     subscriptions ->> Token_2022: TransferChecked (2343cu)
-    subscriptions ->> subscriptions: unnamed (137cu)
+    subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
 
 **TransferRecurring: sequence diagram, with lifelines**
@@ -204,7 +204,7 @@ sequenceDiagram
     bob ->>+ subscriptions: TransferRecurring
     subscriptions ->>+ Token_2022: TransferChecked
     Token_2022 -->>- subscriptions: ok (2343cu)
-    subscriptions ->>+ subscriptions: unnamed
+    subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
     subscriptions -->>- bob: ok (9675cu)
 ```

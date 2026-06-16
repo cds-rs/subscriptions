@@ -9,11 +9,11 @@
 ```text
 
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 5048cu  signer=alice
-    ├── System [2] ✓ (no cu)
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 5054cu  signer=alice
+    ├── System::CreateAccount [2] ✓ (no cu)
     └── Error: InvalidAssociatedTokenAccountDerivedAddress
 Error: InstructionError(0, Custom(108))
-Compute Units (this run): 5048
+Compute Units (this run): 5054
 Fee: 5000 lamports
 Legend (2):
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF

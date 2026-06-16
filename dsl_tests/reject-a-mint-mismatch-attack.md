@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[merchant]
-└── subscriptions::CreatePlan [1] ✗ 497cu  signer=merchant
+└── subscriptions::CreatePlan [1] ✗ 503cu  signer=merchant
     └── Error: MintMismatch
 Error: InstructionError(0, Custom(125))
-Compute Units (this run): 497
+Compute Units (this run): 503
 Fee: 5000 lamports
 Legend (2):
   merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq

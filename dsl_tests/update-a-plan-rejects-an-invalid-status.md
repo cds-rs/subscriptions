@@ -8,7 +8,7 @@
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3455cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3455
 Fee: 5000 lamports
 Legend (2):
@@ -25,7 +25,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3455cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan: sequence diagram, with lifelines**
@@ -37,7 +37,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3455cu)
 ```
@@ -78,10 +78,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[merchant]
-└── subscriptions::UpdatePlan [1] ✗ 369cu  signer=merchant
+└── subscriptions::UpdatePlan [1] ✗ 375cu  signer=merchant
     └── Error: InvalidPlanStatus
 Error: InstructionError(0, Custom(512))
-Compute Units (this run): 369
+Compute Units (this run): 375
 Fee: 5000 lamports
 Legend (2):
   merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq

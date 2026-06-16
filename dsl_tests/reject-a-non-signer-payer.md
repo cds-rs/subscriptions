@@ -9,10 +9,10 @@
 ```text
 
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 391cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 397cu  signer=alice
     └── Error: NotSigner
 Error: InstructionError(0, Custom(100))
-Compute Units (this run): 391
+Compute Units (this run): 397
 Fee: 5000 lamports
 Legend (2):
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF

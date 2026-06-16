@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (7742cu)
 ```
@@ -91,7 +91,7 @@ flowchart LR
 
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
-    └── System [2] ✓ (no cu)
+    └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
@@ -108,7 +108,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (3468cu)
-    subscriptions ->> System: unnamed
+    subscriptions ->> System: CreateAccount
 ```
 
 **CreatePlan: sequence diagram, with lifelines**
@@ -120,7 +120,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
     subscriptions -->>- merchant: ok (3468cu)
 ```
@@ -164,7 +164,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::CancelSubscription [1] ✓ 2027cu  signer=alice
-    └── subscriptions [2] ✓ 137cu
+    └── subscriptions::EmitEvent [2] ✓ 137cu
 Compute Units (this run): 2027
 Fee: 5000 lamports
 Legend (2):
@@ -180,7 +180,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     alice ->> subscriptions: CancelSubscription (2027cu)
-    subscriptions ->> subscriptions: unnamed (137cu)
+    subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
 
 **CancelSubscription: sequence diagram, with lifelines**
@@ -191,7 +191,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     alice ->>+ subscriptions: CancelSubscription
-    subscriptions ->>+ subscriptions: unnamed
+    subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
     subscriptions -->>- alice: ok (2027cu)
 ```
@@ -233,10 +233,10 @@ flowchart LR
 ```text
 
 Transaction  signers=[alice]
-└── subscriptions::RevokeDelegation [1] ✗ 406cu  signer=alice
+└── subscriptions::RevokeDelegation [1] ✗ 412cu  signer=alice
     └── Error: SubscriptionNotCancelled
 Error: InstructionError(0, Custom(510))
-Compute Units (this run): 406
+Compute Units (this run): 412
 Fee: 5000 lamports
 Legend (2):
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
@@ -251,8 +251,8 @@ Legend (2):
 
 Transaction  signers=[merchant]
 └── subscriptions::TransferSubscription [1] ✓ 6032cu  signer=merchant
-    ├── Token [2] ✓ 113cu
-    └── subscriptions [2] ✓ 137cu
+    ├── Token::TransferChecked [2] ✓ 113cu
+    └── subscriptions::EmitEvent [2] ✓ 137cu
 Compute Units (this run): 6032
 Fee: 5000 lamports
 Legend (2):
@@ -269,8 +269,8 @@ sequenceDiagram
     participant subscriptions
     participant Token
     merchant ->> subscriptions: TransferSubscription (6032cu)
-    subscriptions ->> Token: unnamed (113cu)
-    subscriptions ->> subscriptions: unnamed (137cu)
+    subscriptions ->> Token: TransferChecked (113cu)
+    subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
 
 **TransferSubscription: sequence diagram, with lifelines**
@@ -282,9 +282,9 @@ sequenceDiagram
     participant subscriptions
     participant Token
     merchant ->>+ subscriptions: TransferSubscription
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: TransferChecked
     Token -->>- subscriptions: ok (113cu)
-    subscriptions ->>+ subscriptions: unnamed
+    subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
     subscriptions -->>- merchant: ok (6032cu)
 ```

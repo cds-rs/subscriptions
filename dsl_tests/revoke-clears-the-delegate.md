@@ -10,8 +10,8 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::CreateAccount [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 9242
 Fee: 5000 lamports
 Legend (2):
@@ -29,8 +29,8 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (9242cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: CreateAccount
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -43,9 +43,9 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (9242cu)
 ```
@@ -95,7 +95,7 @@ flowchart LR
 
 Transaction  signers=[alice]
 └── subscriptions::RevokeSubscriptionAuthority [1] ✓ 3097cu  signer=alice
-    └── Token [2] ✓ 108cu
+    └── Token::Revoke [2] ✓ 108cu
 Compute Units (this run): 3097
 Fee: 5000 lamports
 Legend (2):
@@ -112,7 +112,7 @@ sequenceDiagram
     participant subscriptions
     participant Token
     alice ->> subscriptions: RevokeSubscriptionAuthority (3097cu)
-    subscriptions ->> Token: unnamed (108cu)
+    subscriptions ->> Token: Revoke (108cu)
 ```
 
 **RevokeSubscriptionAuthority: sequence diagram, with lifelines**
@@ -124,7 +124,7 @@ sequenceDiagram
     participant subscriptions
     participant Token
     alice ->>+ subscriptions: RevokeSubscriptionAuthority
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Revoke
     Token -->>- subscriptions: ok (108cu)
     subscriptions -->>- alice: ok (3097cu)
 ```

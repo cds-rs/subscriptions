@@ -10,10 +10,10 @@
 
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 13018cu  signer=alice
-    ├── System [2] ✓ (no cu)
-    ├── System [2] ✓ (no cu)
-    ├── System [2] ✓ (no cu)
-    └── Token [2] ✓ 126cu
+    ├── System::Transfer [2] ✓ (no cu)
+    ├── System::Allocate [2] ✓ (no cu)
+    ├── System::Assign [2] ✓ (no cu)
+    └── Token::Approve [2] ✓ 126cu
 Compute Units (this run): 13018
 Fee: 5000 lamports
 Legend (2):
@@ -31,10 +31,10 @@ sequenceDiagram
     participant System
     participant Token
     alice ->> subscriptions: InitSubscriptionAuthority (13018cu)
-    subscriptions ->> System: unnamed
-    subscriptions ->> System: unnamed
-    subscriptions ->> System: unnamed
-    subscriptions ->> Token: unnamed (126cu)
+    subscriptions ->> System: Transfer
+    subscriptions ->> System: Allocate
+    subscriptions ->> System: Assign
+    subscriptions ->> Token: Approve (126cu)
 ```
 
 **InitSubscriptionAuthority: sequence diagram, with lifelines**
@@ -47,13 +47,13 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: Transfer
     System -->>- subscriptions: ok
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: Allocate
     System -->>- subscriptions: ok
-    subscriptions ->>+ System: unnamed
+    subscriptions ->>+ System: Assign
     System -->>- subscriptions: ok
-    subscriptions ->>+ Token: unnamed
+    subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
     subscriptions -->>- alice: ok (13018cu)
 ```
