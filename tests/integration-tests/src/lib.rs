@@ -12,6 +12,12 @@ pub mod tests {
 }
 
 #[cfg(test)]
+mod audit_high_3_1_1;
+#[cfg(test)]
+mod audit_high_3_1_3;
+#[cfg(test)]
+mod audit_high_ghost_plan;
+#[cfg(test)]
 mod test_cancel_subscription;
 #[cfg(test)]
 mod test_close_subscription_authority;
