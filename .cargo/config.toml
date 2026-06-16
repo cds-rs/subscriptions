@@ -12,5 +12,5 @@
 # is small, so the serial cost is negligible; override with `--test-threads` if a
 # run doesn't care about the snapshots.
 [env]
-MD_REPORTS_DIR = { value = "dsl_tests", relative = true }
+MD_REPORTS_DIR = { value = "dsl_audits", relative = true }
 RUST_TEST_THREADS = "1"
