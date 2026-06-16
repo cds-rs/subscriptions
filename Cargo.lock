@@ -2260,7 +2260,7 @@ dependencies = [
 [[package]]
 name = "litesvm-utils"
 version = "0.4.0"
-source = "git+https://github.com/cds-rs/anchor-litesvm?branch=turbin3#92d0e9c6592036cf05e1b9766eb24938a6961dd0"
+source = "git+https://github.com/cds-rs/anchor-litesvm?branch=turbin3#c45d76bd5ac998ca0913282cf807a4c3536731a5"
 dependencies = [
  "base64 0.22.1",
  "indexmap 2.14.0",
@@ -5819,7 +5819,7 @@ dependencies = [
 [[package]]
 name = "testsvm"
 version = "0.4.0"
-source = "git+https://github.com/cds-rs/anchor-litesvm?branch=turbin3#92d0e9c6592036cf05e1b9766eb24938a6961dd0"
+source = "git+https://github.com/cds-rs/anchor-litesvm?branch=turbin3#c45d76bd5ac998ca0913282cf807a4c3536731a5"
 dependencies = [
  "solana-account",
  "solana-clock",
