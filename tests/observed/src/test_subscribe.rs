@@ -46,14 +46,14 @@ fn subscribe_with_sponsor_tells_who_pays() {
     backend.fund_sol(&sponsor.pubkey(), 10_000_000_000);
 
     // --- fabricate the mint + Alice's funded ATA (not observed) -------------
-    let mint = init_mint(backend.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
-    init_ata(backend.svm_mut(), mint, alice.pubkey(), 100_000_000);
+    let mint = init_mint(&mut backend, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
+    init_ata(&mut backend, mint, alice.pubkey(), 100_000_000);
 
     // --- setup sends through their builders (must succeed; not the focus) ---
     md.step("Set the stage: Alice's authority, the merchant's plan");
-    initialize_subscription_authority_action(backend.svm_mut(), &alice, mint).0.assert_ok();
+    initialize_subscription_authority_action(&mut backend, &alice, mint).0.assert_ok();
     let end_ts = NOW + days(30) as i64;
-    let (plan_res, plan_pda) = CreatePlan::new(backend.svm_mut(), &merchant, mint)
+    let (plan_res, plan_pda) = CreatePlan::new(&mut backend, &merchant, mint)
         .plan_id(1)
         .amount(50_000_000)
         .period_hours(1)
@@ -114,8 +114,8 @@ fn subscribe_with_sponsor_tells_who_pays() {
 
     // --- the observed send: Alice subscribes, the sponsor pays --------------
     md.step("Alice subscribes; the sponsor pays");
-    let alice_before = backend.svm().get_account(&alice.pubkey()).unwrap().lamports;
-    let sponsor_before = backend.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
+    let alice_before = backend.get_account(&alice.pubkey()).unwrap().lamports;
+    let sponsor_before = backend.get_account(&sponsor.pubkey()).unwrap().lamports;
 
     let ix = build_subscribe_ix(
         &backend, &alice, &merchant, plan_pda, plan_bump, mint, &sponsor, subscription_pda,
@@ -125,8 +125,8 @@ fn subscribe_with_sponsor_tells_who_pays() {
     assert!(record.error.is_none(), "subscribe should succeed: {:?}", record.error);
     let result: TransactionResult = record.into();
 
-    let alice_after = backend.svm().get_account(&alice.pubkey()).unwrap().lamports;
-    let sponsor_after = backend.svm().get_account(&sponsor.pubkey()).unwrap().lamports;
+    let alice_after = backend.get_account(&alice.pubkey()).unwrap().lamports;
+    let sponsor_after = backend.get_account(&sponsor.pubkey()).unwrap().lamports;
 
     // --- the story, with teeth ---------------------------------------------
     md.transition(
@@ -138,7 +138,7 @@ fn subscribe_with_sponsor_tells_who_pays() {
     );
     md.check("the sponsor was charged", true, sponsor_after < sponsor_before);
 
-    let sub_acc = backend.svm().get_account(&subscription_pda).unwrap();
+    let sub_acc = backend.get_account(&subscription_pda).unwrap();
     let sub = SubscriptionDelegation::load(&sub_acc.data).unwrap();
     let payer = Pubkey::new_from_array(sub.header.payer.to_bytes());
     let delegator = Pubkey::new_from_array(sub.header.delegator.to_bytes());
@@ -171,7 +171,7 @@ fn subscribe_with_sponsor_tells_who_pays() {
          them match would hand the program the keys in the wrong slots (it reads roles by position, \
          not by name).",
     );
-    render_all(&mut md, &result, backend.svm(), "Subscribe");
+    render_all(&mut md, &result, &backend, "Subscribe");
 
     // Echo to stdout for the spike (run with --nocapture).
     result.print_logs_structured();
@@ -193,9 +193,9 @@ fn build_subscribe_ix(
     subscription_authority_pda: Pubkey,
     event_authority: Pubkey,
 ) -> Instruction {
-    let plan_acc = backend.svm().get_account(&plan_pda).unwrap();
+    let plan_acc = backend.get_account(&plan_pda).unwrap();
     let plan = Plan::load(&plan_acc.data).unwrap();
-    let auth_acc = backend.svm().get_account(&subscription_authority_pda).unwrap();
+    let auth_acc = backend.get_account(&subscription_authority_pda).unwrap();
     let init_id = SubscriptionAuthority::load(&auth_acc.data).unwrap().init_id;
 
     let accounts = vec![

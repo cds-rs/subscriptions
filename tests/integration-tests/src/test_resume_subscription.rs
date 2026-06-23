@@ -9,6 +9,8 @@ use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     state::{common::PlanStatus, header::VERSION_OFFSET, subscription_delegation::SubscriptionDelegation},
     tests::{
@@ -361,7 +363,7 @@ fn resume_subscription_version_mismatch() {
     world.md().step("Downgrade the subscription's version byte");
     let mut account = world.svm().get_account(&s.subscription_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(s.subscription_pda, account).unwrap();
+    world.svm_mut().set_account(&s.subscription_pda, account);
 
     world.md().step("Alice resumes; the stale version is refused");
     let resume_ix = ResumeSubscription::new(world.svm_mut(), &s.alice, s.plan_pda, s.subscription_pda).instruction();

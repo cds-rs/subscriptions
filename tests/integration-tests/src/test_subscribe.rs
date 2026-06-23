@@ -10,6 +10,8 @@ use solana_instruction::{AccountMeta, Instruction};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     event_engine::event_authority_pda,
     instructions::subscribe,

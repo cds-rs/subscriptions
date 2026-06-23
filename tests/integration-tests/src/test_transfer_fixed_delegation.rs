@@ -6,6 +6,8 @@
 //! pulls against it through the observed `send_*`. Every send renders its surface
 //! into the test's report under `target/md-reports/`.
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     event_engine::event_authority_pda,
     instructions::transfer_fixed_delegation,
@@ -15,7 +17,7 @@ use crate::{
         idl,
         pda::get_subscription_authority_pda,
         utils::{
-            days, get_ata_balance, init_aux_token_account, init_mint, install_transfer_hook_extra_metas,
+            days, token_balance, init_aux_token_account, init_mint, install_transfer_hook_extra_metas,
             load_transfer_hook_example, set_transfer_hook_config, CloseSubscriptionAuthority, CreateDelegation,
             ObservedResultExt, RevokeDelegation, TransferDelegation, World, TRANSFER_HOOK_EXAMPLE_PROGRAM_ID,
         },
@@ -72,7 +74,7 @@ fn test_fixed_transfer_success() {
     let (alice, bob, delegation_pda, mint, _alice_ata, bob_ata) =
         setup_fixed_delegation(&mut world, amount, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls 30 tokens against his fixed delegation");
@@ -82,7 +84,7 @@ fn test_fixed_transfer_success() {
         .fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 30 tokens", 30_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -128,8 +130,8 @@ fn test_fixed_transfer_token_2022_transfer_fee() {
         TransferDelegation::new(world.svm_mut(), &bob, alice.pubkey(), mint, delegation_pda).amount(10_000_000).fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed");
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA debited the gross 10 tokens", 90_000_000, alice_balance);
     world.md().check("Bob received 10 tokens net of the 1% fee", 9_900_000, bob_balance);
 
@@ -173,8 +175,8 @@ fn test_fixed_transfer_token_2022_confidential_transfer_public_balance() {
         TransferDelegation::new(world.svm_mut(), &bob, alice.pubkey(), mint, delegation_pda).amount(10_000_000).fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed");
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA debited 10 tokens", 90_000_000, alice_balance);
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 }
@@ -214,8 +216,8 @@ fn test_fixed_transfer_token_2022_unconfigured_transfer_hook() {
         TransferDelegation::new(world.svm_mut(), &bob, alice.pubkey(), mint, delegation_pda).amount(10_000_000).fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed");
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA debited 10 tokens", 90_000_000, alice_balance);
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 }
@@ -258,7 +260,7 @@ fn test_fixed_transfer_token_2022_active_transfer_hook() {
         TransferDelegation::new(world.svm_mut(), &bob, alice.pubkey(), mint, delegation_pda).amount(10_000_000).fixed_ix();
     let missing_accounts = world.send(&[ix], &[&bob], "TransferFixed (missing hook accounts)");
     assert!(!missing_accounts.is_success(), "transfer without hook accounts should fail");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA is still empty", 0, bob_balance);
 
     world.md().step("Bob retries with the hook accounts attached; the hook runs");
@@ -273,8 +275,8 @@ fn test_fixed_transfer_token_2022_active_transfer_hook() {
         .fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed (with hook accounts)");
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     let hook_runs = world.svm().get_account(&counter).unwrap().data[0];
     world.md().check("Alice's ATA debited 10 tokens", 90_000_000, alice_balance);
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
@@ -339,7 +341,7 @@ fn test_fixed_transfer_multiple_times() {
 
     let (alice, bob, delegation_pda, mint, _, bob_ata) = setup_fixed_delegation(&mut world, amount, expiry_s, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls 30 tokens, leaving 20");
@@ -349,7 +351,7 @@ fn test_fixed_transfer_multiple_times() {
         .fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed (first pull)");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 30 tokens", 30_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -367,7 +369,7 @@ fn test_fixed_transfer_multiple_times() {
         SubscriptionsError::AmountExceedsLimit,
     );
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's balance is unchanged", 30_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -387,7 +389,7 @@ fn test_fixed_transfer_exceeds_amount() {
 
     let (alice, bob, delegation_pda, mint, _, bob_ata) = setup_fixed_delegation(&mut world, amount, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob tries to pull 60 tokens against a 50-token allowance");
@@ -397,7 +399,7 @@ fn test_fixed_transfer_exceeds_amount() {
         .fixed_ix();
     world.send_err(&[ix], &[&bob], "TransferFixed (exceeds allowance)", SubscriptionsError::AmountExceedsLimit);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA is still empty", 0, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -417,7 +419,7 @@ fn test_fixed_transfer_expired() {
 
     let (alice, bob, delegation_pda, mint, _, bob_ata) = setup_fixed_delegation(&mut world, amount, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls 30 tokens within the window");
@@ -426,7 +428,7 @@ fn test_fixed_transfer_expired() {
         .amount(transfer_amount)
         .fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed (within window)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 30 tokens", 30_000_000, bob_balance);
 
     world.md().step("The clock advances past expiry; a further pull is refused");
@@ -437,7 +439,7 @@ fn test_fixed_transfer_expired() {
         .amount(transfer_amount)
         .fixed_ix();
     world.send_err(&[ix], &[&bob], "TransferFixed (expired)", SubscriptionsError::DelegationExpired);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's balance is unchanged", 30_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -494,7 +496,7 @@ fn test_fixed_transfer_to_third_party() {
         .fixed_ix();
     world.send_ok(&[ix], &[&bob], "TransferFixed (to third party)");
 
-    let charlie_balance = get_ata_balance(world.svm(), &charlie_ata);
+    let charlie_balance = token_balance(world.svm(), &charlie_ata);
     world.md().check("Charlie received 10 tokens", 10_000_000, charlie_balance);
 }
 
@@ -537,8 +539,8 @@ fn fixed_delegation_rejects_transfer_with_different_mint_authority() {
         .fixed_ix();
     world.send_err(&[ix], &[&bob], "TransferFixed (mismatched mint)", SubscriptionsError::InvalidDelegatePda);
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_high_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_high_ata);
+    let alice_balance = token_balance(world.svm(), &alice_high_ata);
+    let bob_balance = token_balance(world.svm(), &bob_high_ata);
     world.md().check("Alice's high-value ATA is untouched", 100_000_000, alice_balance);
     world.md().check("Bob's high-value ATA is empty", 0, bob_balance);
 
@@ -598,9 +600,9 @@ fn fixed_transfer_rejects_approved_non_canonical_source() {
         SubscriptionsError::InvalidAssociatedTokenAccountDerivedAddress,
     );
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let alice_aux_balance = get_ata_balance(world.svm(), &alice_aux);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let alice_aux_balance = token_balance(world.svm(), &alice_aux);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA is untouched", 5_000_000, alice_balance);
     world.md().check("Alice's aux account is untouched", 100_000_000, alice_aux_balance);
     world.md().check("Bob's ATA is empty", 0, bob_balance);
@@ -758,8 +760,8 @@ fn test_fixed_transfer_delegator_mismatch_exploit() {
         .fixed_ix();
     world.send_err(&[ix], &[&bob], "TransferFixed (delegator mismatch)", SubscriptionsError::Unauthorized);
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's funds are untouched", 100_000_000, alice_balance);
     world.md().check("Bob received no funds", 0, bob_balance);
 }
@@ -779,14 +781,14 @@ fn test_fixed_transfer_version_mismatch() {
     world.md().step("The delegation's header version byte is corrupted to 0");
     let mut account = world.svm().get_account(&delegation_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(delegation_pda, account).unwrap();
+    world.svm_mut().set_account(&delegation_pda, account);
 
     world.md().step("Bob pulls against the stale delegation; migration is required");
     let ix = TransferDelegation::new(world.svm_mut(), &bob, alice.pubkey(), mint, delegation_pda)
         .amount(10_000_000)
         .fixed_ix();
     world.send_err(&[ix], &[&bob], "TransferFixed (version mismatch)", SubscriptionsError::MigrationRequired);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA is empty", 0, bob_balance);
 }
 
@@ -816,8 +818,8 @@ fn test_fixed_transfer_stale_subscription_authority() {
         .amount(10_000_000)
         .fixed_ix();
     world.send_err(&[ix], &[&bob], "TransferFixed (stale authority)", SubscriptionsError::StaleSubscriptionAuthority);
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's funds are untouched", 100_000_000, alice_balance);
     world.md().check("Bob's ATA is empty", 0, bob_balance);
 
@@ -879,7 +881,7 @@ fn test_close_subscription_authority_blocks_all_transfers() {
         SubscriptionsError::InvalidSubscriptionAuthorityPda,
     );
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
     world.md().check("Alice's funds are untouched", 100_000_000, alice_balance);
 
     let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, bob.pubkey(), 0).instruction();

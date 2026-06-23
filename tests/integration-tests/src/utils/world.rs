@@ -38,7 +38,6 @@ use litesvm_utils::{
     deterministic_keypair, Keypair, LiteSVM, LiteSvmBackend, MarkdownBlock, Pubkey, Report, Signer, TestSVM,
     TransactionResult,
 };
-use solana_clock::Clock;
 use solana_instruction::{AccountMeta, Instruction};
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
@@ -90,11 +89,9 @@ impl World {
         let mut svm = LiteSVM::new();
         let so = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/subscriptions_program.so");
         svm.add_program_from_file(PROGRAM_ID.to_bytes(), so).unwrap();
-        let mut clock = svm.get_sysvar::<Clock>();
-        clock.unix_timestamp = NOW;
-        svm.set_sysvar::<Clock>(&clock);
 
         let mut backend = LiteSvmBackend::new(svm);
+        backend.warp_to_timestamp(NOW);
         backend.register_alias(&PROGRAM_ID, "subscriptions");
         backend.register_alias(&Pubkey::new_from_array(event_authority_pda::ID.to_bytes()), "EventAuthority");
 
@@ -172,16 +169,16 @@ impl World {
 
     // --- escape hatches to the inner svm and report --------------------------
 
-    /// The inner `LiteSVM`, for the suite's fabrication helpers (`init_mint`,
+    /// The backend, for the suite's fabrication helpers (`init_mint`,
     /// `init_ata`, ...). Sends made directly through this are setup, not the
     /// observed action under test.
-    pub fn svm_mut(&mut self) -> &mut LiteSVM {
-        self.backend.svm_mut()
+    pub fn svm_mut(&mut self) -> &mut LiteSvmBackend {
+        &mut self.backend
     }
 
-    /// Read-only view of the inner `LiteSVM`.
-    pub fn svm(&self) -> &LiteSVM {
-        self.backend.svm()
+    /// Read-only view of the backend.
+    pub fn svm(&self) -> &LiteSvmBackend {
+        &self.backend
     }
 
     /// The narrative report, for `md.step` / `md.note` / `md.check` steps.
@@ -192,16 +189,17 @@ impl World {
     /// The world's current unix timestamp (the pinned clock, advanced by
     /// [`warp`](Self::warp)).
     pub fn now(&self) -> i64 {
-        self.backend.svm().get_sysvar::<Clock>().unix_timestamp
+        self.backend.clock().unix_timestamp
     }
 
     /// Advance the clock by `seconds` (and the slot, mirroring the suite's
     /// `move_clock_forward`).
     pub fn warp(&mut self, seconds: u64) {
-        let mut clock = self.backend.svm().get_sysvar::<Clock>();
-        clock.unix_timestamp += seconds as i64;
-        clock.slot += seconds * 2;
-        self.backend.svm_mut().set_sysvar::<Clock>(&clock);
+        // Each setter read-modify-writes the same Clock, touching only its own
+        // field, so two sequential calls reproduce the old single combined write.
+        let clock = self.backend.clock();
+        self.backend.warp_to_timestamp(clock.unix_timestamp + seconds as i64);
+        self.backend.warp_to_slot(clock.slot + seconds * 2);
     }
 
     // --- the observed send ---------------------------------------------------
@@ -258,7 +256,7 @@ impl World {
         mint: Pubkey,
         sponsor: Option<&Keypair>,
     ) -> (TransactionResult, Pubkey, u8) {
-        let token_program = self.backend.svm().get_account(&mint).unwrap().owner;
+        let token_program = self.backend.get_account(&mint).unwrap().owner;
         let user_ata = get_associated_token_address_with_program_id(&user.pubkey(), &mint, &token_program);
         let (pda, bump) = get_subscription_authority_pda(&user.pubkey(), &mint);
         self.prop(pda, "SubAuthority");

@@ -8,6 +8,7 @@
 //! the rent and `Allocate`/`Assign`s in place, so creation succeeds and this test
 //! (which asserts creation is blocked) fails: that failure is the fix's proof.
 
+use litesvm_utils::TestSVM;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
@@ -34,10 +35,9 @@ fn finding_3_1_3_prefunded_pda_blocks_creation() {
     let _ = &mallory; // the griefer is off-chain here; the pre-funding is the attack
     world.svm_mut()
         .set_account(
-            pda,
+            &pda,
             Account { lamports: 1_000_000, data: vec![], owner: Pubkey::default(), executable: false, rent_epoch: 0 },
-        )
-        .unwrap();
+        );
 
     world.md().step("Alice tries to initialize her authority");
     let (res, _, _) = world.init_authority(&alice, mint, None);

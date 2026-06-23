@@ -7,11 +7,13 @@
 
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     instructions::create_plan::PlanTerms,
     state::{plan::Plan, subscription_delegation::SubscriptionDelegation},
     tests::utils::{
-            days, get_ata_balance, hours, minutes, CancelSubscription, CreatePlan,
+            days, token_balance, hours, minutes, CancelSubscription, CreatePlan,
             CreateSubscription, DeletePlan, ObservedResultExt, RevokeSubscription, TransferSubscription, UpdatePlan,
             World,
         },
@@ -108,7 +110,7 @@ fn cancel_at_exact_end_ts_keeps_final_period_billable() {
     .to(merchant_ata)
     .instruction();
     world.send_ok(&[transfer_ix], &[&merchant], "TransferSubscription");
-    let merchant_balance = get_ata_balance(world.svm(), &merchant_ata);
+    let merchant_balance = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant received the final period's tokens", 20_000_000, merchant_balance);
 }
 
@@ -169,7 +171,7 @@ fn test_cancel_subscription_version_mismatch() {
     world.md().step("Downgrade the subscription's version byte");
     let mut account = world.svm().get_account(&s.subscription_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(s.subscription_pda, account).unwrap();
+    world.svm_mut().set_account(&s.subscription_pda, account);
 
     world.md().step("Alice cancels; the stale version is refused");
     let cancel_ix = CancelSubscription::new(world.svm_mut(), &s.alice, s.plan_pda, s.subscription_pda).instruction();

@@ -8,6 +8,8 @@
 
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     tests::utils::{as_pubkey, CloseSubscriptionAuthority, ObservedResultExt, World},
     SubscriptionAuthority, SubscriptionsError,

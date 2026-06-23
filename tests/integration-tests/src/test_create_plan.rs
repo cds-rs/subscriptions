@@ -10,6 +10,8 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     state::common::PlanStatus,
     state::plan::Plan,
@@ -322,10 +324,9 @@ fn create_plan_prefunded_pda() {
     world.prop(plan_pda_addr, "Plan");
     world.svm_mut()
         .set_account(
-            plan_pda_addr,
+            &plan_pda_addr,
             Account { lamports: 1_000, data: vec![], owner: Pubkey::default(), executable: false, rent_epoch: 0 },
-        )
-        .unwrap();
+        );
 
     let ix = CreatePlan::new(world.svm_mut(), &merchant, mint)
         .plan_id(plan_id)

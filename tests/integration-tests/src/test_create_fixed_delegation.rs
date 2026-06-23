@@ -9,11 +9,13 @@
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     tests::{
         pda::get_delegation_pda,
         utils::{as_pubkey, 
-            days, get_ata_balance, CloseSubscriptionAuthority, CreateDelegation,
+            days, token_balance, CloseSubscriptionAuthority, CreateDelegation,
             ObservedResultExt, RevokeDelegation, TransferDelegation, World,
         },
     },
@@ -210,7 +212,7 @@ fn create_fixed_delegation_with_prefunded_pda() {
     );
     world.svm_mut()
         .set_account(
-            subscription_authority_pda,
+            &subscription_authority_pda,
             Account {
                 lamports: 1_000,
                 data: vec![],
@@ -218,8 +220,7 @@ fn create_fixed_delegation_with_prefunded_pda() {
                 executable: false,
                 rent_epoch: 0,
             },
-        )
-        .unwrap();
+        );
 
     // The user should still be able to create the delegation PDA.
     world.md().step("Despite the pre-funded PDA, Alice creates the fixed delegation");
@@ -581,6 +582,6 @@ fn create_fixed_delegation_with_zero_expiry() {
     };
     world.send_ok(&[transfer_ix], &[&delegatee], "TransferFixed (after 30 days)");
 
-    let bob_balance = get_ata_balance(world.svm(), &delegatee_ata);
+    let bob_balance = token_balance(world.svm(), &delegatee_ata);
     world.md().check("Bob received the pulled amount", transfer_amount, bob_balance);
 }

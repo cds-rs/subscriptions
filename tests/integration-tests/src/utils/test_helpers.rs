@@ -3,9 +3,9 @@ use std::vec::Vec;
 
 pub use scenarios::helpers::{days, minutes, rent_exempt_lamports};
 
-use litesvm::{types::TransactionResult, LiteSVM};
+use litesvm::types::TransactionResult;
+use litesvm_utils::{LiteSVM, LiteSvmBackend, TestSVM};
 use solana_account::Account;
-use solana_clock::Clock;
 use solana_instruction::Instruction;
 use solana_keypair::Keypair;
 use solana_message::Message;
@@ -65,46 +65,48 @@ pub fn current_ts() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
 }
 
-pub fn move_clock_forward(litesvm: &mut LiteSVM, seconds: u64) {
-    let mut initial_clock = litesvm.get_sysvar::<Clock>();
-    initial_clock.unix_timestamp += seconds as i64;
-    initial_clock.slot += seconds * 2;
-    litesvm.set_sysvar::<Clock>(&initial_clock);
+pub fn move_clock_forward(backend: &mut LiteSvmBackend, seconds: u64) {
+    // `warp_to_timestamp` / `warp_to_slot` each read-modify-write the same Clock,
+    // touching only their own field, so two sequential calls reproduce the old
+    // single combined write (unix_timestamp += seconds, slot += seconds*2).
+    let clock = backend.clock();
+    backend.warp_to_timestamp(clock.unix_timestamp + seconds as i64);
+    backend.warp_to_slot(clock.slot + seconds * 2);
 }
 
-pub fn get_ata_balance(litesvm: &LiteSVM, ata: &Pubkey) -> u64 {
-    let account = fetch_account::<spl_token_2022_interface::state::Account>(litesvm, ata);
+pub fn token_balance(backend: &LiteSvmBackend, ata: &Pubkey) -> u64 {
+    let account = fetch_account::<spl_token_2022_interface::state::Account>(backend, ata);
     account.amount
 }
 
-pub fn setup() -> (LiteSVM, Keypair) {
+pub fn setup() -> (LiteSvmBackend, Keypair) {
     let mut litesvm = LiteSVM::new();
 
     let so_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/subscriptions_program.so");
     litesvm.add_program_from_file(PROGRAM_ID.to_bytes(), so_path).unwrap();
 
-    let mut initial_clock = litesvm.get_sysvar::<Clock>();
-    initial_clock.unix_timestamp = current_ts();
-    litesvm.set_sysvar::<Clock>(&initial_clock);
+    let mut backend = LiteSvmBackend::new(litesvm);
+    backend.warp_to_timestamp(current_ts());
 
     let default_payer = Keypair::new();
-    litesvm.airdrop(&default_payer.pubkey(), LAMPORTS_PER_SOL * 100).unwrap();
+    backend.fund_sol(&default_payer.pubkey(), LAMPORTS_PER_SOL * 100);
 
-    (litesvm, default_payer)
+    (backend, default_payer)
 }
 
-pub fn fetch_account<T: Pack + IsInitialized>(litesvm: &LiteSVM, pubkey: &Pubkey) -> T {
-    let account = litesvm.get_account(pubkey).unwrap();
+pub fn fetch_account<T: Pack + IsInitialized>(backend: &LiteSvmBackend, pubkey: &Pubkey) -> T {
+    let account = backend.get_account(pubkey).unwrap();
     T::unpack(&account.data[..T::LEN]).unwrap()
 }
 
 #[allow(clippy::result_large_err)]
 pub fn build_and_send_transaction(
-    litesvm: &mut LiteSVM,
+    backend: &mut LiteSvmBackend,
     signers: &[&Keypair],
     payer: &Pubkey,
     ix: &Instruction,
 ) -> TransactionResult {
+    let litesvm = backend.svm_mut();
     let tx = Transaction::new(signers, Message::new(std::slice::from_ref(ix), Some(payer)), litesvm.latest_blockhash());
     let result = litesvm.send_transaction(tx);
     litesvm.expire_blockhash();
@@ -118,14 +120,14 @@ pub fn build_and_send_transaction(
     result
 }
 
-pub fn init_wallet(litesvm: &mut LiteSVM, lamports: u64) -> Keypair {
+pub fn init_wallet(backend: &mut LiteSvmBackend, lamports: u64) -> Keypair {
     let wallet = Keypair::new();
-    litesvm.airdrop(&wallet.pubkey(), lamports).unwrap();
+    backend.fund_sol(&wallet.pubkey(), lamports);
     wallet
 }
 
 pub fn init_mint(
-    litesvm: &mut LiteSVM,
+    backend: &mut LiteSvmBackend,
     token_program: Pubkey,
     decimals: u8,
     supply: u64,
@@ -194,44 +196,43 @@ pub fn init_mint(
         }
     }
 
-    let lamports = litesvm.minimum_balance_for_rent_exemption(space);
+    let lamports = rent_exempt_lamports(space);
 
-    litesvm
-        .set_account(
-            mint,
-            Account { lamports, data: mint_data, owner: token_program, executable: false, rent_epoch: 0 },
-        )
-        .unwrap();
+    backend.set_account(
+        &mint,
+        Account { lamports, data: mint_data, owner: token_program, executable: false, rent_epoch: 0 },
+    );
 
     mint
 }
 
 pub fn set_transfer_hook_config(
-    litesvm: &mut LiteSVM,
+    backend: &mut LiteSvmBackend,
     mint: Pubkey,
     authority: Option<Pubkey>,
     program_id: Option<Pubkey>,
 ) {
-    let mut account = litesvm.get_account(&mint).unwrap();
+    let mut account = backend.get_account(&mint).unwrap();
     {
         let mut state = StateWithExtensionsMut::<Mint2022>::unpack(&mut account.data).unwrap();
         let extension = state.get_extension_mut::<TransferHook>().unwrap();
         extension.authority = authority.try_into().unwrap();
         extension.program_id = program_id.try_into().unwrap();
     }
-    litesvm.set_account(mint, account).unwrap();
+    backend.set_account(&mint, account);
 }
 
 pub const TRANSFER_HOOK_EXAMPLE_PROGRAM_ID: Pubkey = Pubkey::new_from_array([42u8; 32]);
 
-pub fn load_transfer_hook_example(litesvm: &mut LiteSVM) {
+pub fn load_transfer_hook_example(backend: &mut LiteSvmBackend) {
     let so_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../transfer-hook-example/target/deploy/transfer_hook_example.so");
-    litesvm.add_program_from_file(TRANSFER_HOOK_EXAMPLE_PROGRAM_ID.to_bytes(), so_path).unwrap();
+    let bytes = std::fs::read(so_path).unwrap();
+    backend.deploy_program(TRANSFER_HOOK_EXAMPLE_PROGRAM_ID, &bytes);
 }
 
 #[cfg(test)]
-pub fn install_transfer_hook_extra_metas(litesvm: &mut LiteSVM, mint: Pubkey) -> (Pubkey, Pubkey) {
+pub fn install_transfer_hook_extra_metas(backend: &mut LiteSvmBackend, mint: Pubkey) -> (Pubkey, Pubkey) {
     let program_id = TRANSFER_HOOK_EXAMPLE_PROGRAM_ID;
     let (validation_pda, _) = Pubkey::find_program_address(&[b"extra-account-metas", mint.as_ref()], &program_id);
     let counter = Pubkey::new_unique();
@@ -245,57 +246,53 @@ pub fn install_transfer_hook_extra_metas(litesvm: &mut LiteSVM, mint: Pubkey) ->
     let mut validation_data = vec![0u8; ExtraAccountMetaList::size_of(1).unwrap()];
     ExtraAccountMetaList::init::<ExecuteInstruction>(&mut validation_data, &[meta]).unwrap();
 
-    let validation_lamports = litesvm.minimum_balance_for_rent_exemption(validation_data.len());
-    litesvm
-        .set_account(
-            validation_pda,
-            Account {
-                lamports: validation_lamports,
-                data: validation_data,
-                owner: program_id,
-                executable: false,
-                rent_epoch: 0,
-            },
-        )
-        .unwrap();
+    let validation_lamports = rent_exempt_lamports(validation_data.len());
+    backend.set_account(
+        &validation_pda,
+        Account {
+            lamports: validation_lamports,
+            data: validation_data,
+            owner: program_id,
+            executable: false,
+            rent_epoch: 0,
+        },
+    );
 
-    let counter_lamports = litesvm.minimum_balance_for_rent_exemption(1);
-    litesvm
-        .set_account(
-            counter,
-            Account {
-                lamports: counter_lamports,
-                data: vec![0u8; 1],
-                owner: program_id,
-                executable: false,
-                rent_epoch: 0,
-            },
-        )
-        .unwrap();
+    let counter_lamports = rent_exempt_lamports(1);
+    backend.set_account(
+        &counter,
+        Account {
+            lamports: counter_lamports,
+            data: vec![0u8; 1],
+            owner: program_id,
+            executable: false,
+            rent_epoch: 0,
+        },
+    );
 
     (validation_pda, counter)
 }
 
-pub fn init_ata(litesvm: &mut LiteSVM, mint: Pubkey, owner: Pubkey, amount: u64) -> Pubkey {
-    let token_program = litesvm.get_account(&mint).unwrap().owner;
+pub fn init_ata(backend: &mut LiteSvmBackend, mint: Pubkey, owner: Pubkey, amount: u64) -> Pubkey {
+    let token_program = backend.get_account(&mint).unwrap().owner;
     let ata = get_associated_token_address_with_program_id(&owner, &mint, &token_program);
-    init_token_account_at(litesvm, ata, mint, owner, amount)
+    init_token_account_at(backend, ata, mint, owner, amount)
 }
 
-pub fn init_aux_token_account(litesvm: &mut LiteSVM, mint: Pubkey, owner: Pubkey, amount: u64) -> Pubkey {
-    init_token_account_at(litesvm, Pubkey::new_unique(), mint, owner, amount)
+pub fn init_aux_token_account(backend: &mut LiteSvmBackend, mint: Pubkey, owner: Pubkey, amount: u64) -> Pubkey {
+    init_token_account_at(backend, Pubkey::new_unique(), mint, owner, amount)
 }
 
 fn init_token_account_at(
-    litesvm: &mut LiteSVM,
+    backend: &mut LiteSvmBackend,
     token_account: Pubkey,
     mint: Pubkey,
     owner: Pubkey,
     amount: u64,
 ) -> Pubkey {
-    let token_program = litesvm.get_account(&mint).unwrap().owner;
+    let token_program = backend.get_account(&mint).unwrap().owner;
     let account_extensions = if token_program == crate::tests::constants::TOKEN_2022_PROGRAM_ID {
-        let mint_account = litesvm.get_account(&mint).unwrap();
+        let mint_account = backend.get_account(&mint).unwrap();
         let mint_state = StateWithExtensions::<Mint2022>::unpack(&mint_account.data).unwrap();
         let mint_extensions = mint_state.get_extension_types().unwrap();
         ExtensionType::get_required_init_account_extensions(&mint_extensions)
@@ -348,33 +345,31 @@ fn init_token_account_at(
             }
         }
     }
-    let lamports = litesvm.minimum_balance_for_rent_exemption(space);
+    let lamports = rent_exempt_lamports(space);
 
-    litesvm
-        .set_account(
-            token_account,
-            Account { lamports, data: ata_data, owner: token_program, executable: false, rent_epoch: 0 },
-        )
-        .unwrap();
+    backend.set_account(
+        &token_account,
+        Account { lamports, data: ata_data, owner: token_program, executable: false, rent_epoch: 0 },
+    );
 
     token_account
 }
 
 pub fn initialize_subscription_authority_action(
-    litesvm: &mut LiteSVM,
+    backend: &mut LiteSvmBackend,
     payer: &Keypair,
     mint: Pubkey,
 ) -> (TransactionResult, Pubkey, u8) {
-    initialize_subscription_authority_action_with_sponsor(litesvm, payer, mint, None)
+    initialize_subscription_authority_action_with_sponsor(backend, payer, mint, None)
 }
 
 pub fn initialize_subscription_authority_action_with_sponsor(
-    litesvm: &mut LiteSVM,
+    backend: &mut LiteSvmBackend,
     user: &Keypair,
     mint: Pubkey,
     sponsor: Option<&Keypair>,
 ) -> (TransactionResult, Pubkey, u8) {
-    let token_program = litesvm.get_account(&mint).unwrap().owner;
+    let token_program = backend.get_account(&mint).unwrap().owner;
     let user_ata = get_associated_token_address_with_program_id(&user.pubkey(), &mint, &token_program);
     let (subscription_authority_pda, bump) = get_subscription_authority_pda(&user.pubkey(), &mint);
 
@@ -399,11 +394,11 @@ pub fn initialize_subscription_authority_action_with_sponsor(
     let ix =
         Instruction { program_id: PROGRAM_ID, accounts, data: vec![*initialize_subscription_authority::DISCRIMINATOR] };
 
-    (build_and_send_transaction(litesvm, &signers, &fee_payer, &ix), subscription_authority_pda, bump)
+    (build_and_send_transaction(backend, &signers, &fee_payer, &ix), subscription_authority_pda, bump)
 }
 
 pub struct CreateDelegation<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     delegator: &'a Keypair,
     payer: Option<&'a Keypair>,
     mint: Pubkey,
@@ -414,7 +409,7 @@ pub struct CreateDelegation<'a> {
 }
 
 impl<'a> CreateDelegation<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey) -> Self {
         Self {
             litesvm,
             delegator,
@@ -575,7 +570,7 @@ impl<'a> CreateDelegation<'a> {
 }
 
 pub struct TransferDelegation<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     signer: &'a Keypair,
     delegator: Pubkey,
     mint: Pubkey,
@@ -588,7 +583,7 @@ pub struct TransferDelegation<'a> {
 
 impl<'a> TransferDelegation<'a> {
     pub fn new(
-        litesvm: &'a mut LiteSVM,
+        litesvm: &'a mut LiteSvmBackend,
         signer: &'a Keypair,
         delegator: Pubkey,
         mint: Pubkey,
@@ -700,7 +695,7 @@ impl<'a> TransferDelegation<'a> {
 }
 
 pub struct RevokeDelegation<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     delegator: &'a Keypair,
     signer: Option<&'a Keypair>,
     mint: Pubkey,
@@ -711,7 +706,7 @@ pub struct RevokeDelegation<'a> {
 }
 
 impl<'a> RevokeDelegation<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey, nonce: u64) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey, nonce: u64) -> Self {
         Self { litesvm, delegator, signer: None, mint, delegatee, nonce, receiver: None, custom_pda: None }
     }
 
@@ -755,7 +750,7 @@ impl<'a> RevokeDelegation<'a> {
 }
 
 pub struct CloseSubscriptionAuthority<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     user: &'a Keypair,
     mint: Pubkey,
     custom_pda: Option<Pubkey>,
@@ -763,7 +758,7 @@ pub struct CloseSubscriptionAuthority<'a> {
 }
 
 impl<'a> CloseSubscriptionAuthority<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, user: &'a Keypair, mint: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, user: &'a Keypair, mint: Pubkey) -> Self {
         Self { litesvm, user, mint, custom_pda: None, receiver: None }
     }
 
@@ -798,14 +793,14 @@ impl<'a> CloseSubscriptionAuthority<'a> {
 }
 
 pub struct RevokeSubscriptionAuthority<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     user: &'a Keypair,
     mint: Pubkey,
     custom_ata: Option<Pubkey>,
 }
 
 impl<'a> RevokeSubscriptionAuthority<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, user: &'a Keypair, mint: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, user: &'a Keypair, mint: Pubkey) -> Self {
         Self { litesvm, user, mint, custom_ata: None }
     }
 
@@ -837,7 +832,7 @@ impl<'a> RevokeSubscriptionAuthority<'a> {
 }
 
 pub struct RevokeAbandonedDelegation<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     payer: &'a Keypair,
     delegator: Pubkey,
     mint: Pubkey,
@@ -849,7 +844,7 @@ pub struct RevokeAbandonedDelegation<'a> {
 
 impl<'a> RevokeAbandonedDelegation<'a> {
     pub fn new(
-        litesvm: &'a mut LiteSVM,
+        litesvm: &'a mut LiteSvmBackend,
         payer: &'a Keypair,
         delegator: Pubkey,
         mint: Pubkey,
@@ -896,7 +891,7 @@ impl<'a> RevokeAbandonedDelegation<'a> {
 }
 
 pub struct CreatePlan<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     owner: &'a Keypair,
     data: PlanData,
     destinations_vec: Vec<Pubkey>,
@@ -905,7 +900,7 @@ pub struct CreatePlan<'a> {
 }
 
 impl<'a> CreatePlan<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, owner: &'a Keypair, mint: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, owner: &'a Keypair, mint: Pubkey) -> Self {
         let zero_addr: pinocchio::Address = [0u8; 32].into();
         Self {
             litesvm,
@@ -1025,7 +1020,7 @@ impl<'a> CreatePlan<'a> {
 }
 
 pub struct UpdatePlan<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     owner: &'a Keypair,
     plan_pda: Pubkey,
     pullers_vec: Vec<Pubkey>,
@@ -1033,7 +1028,7 @@ pub struct UpdatePlan<'a> {
 }
 
 impl<'a> UpdatePlan<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
         let zero_addr: pinocchio::Address = [0u8; 32].into();
         Self {
             litesvm,
@@ -1108,13 +1103,13 @@ impl<'a> UpdatePlan<'a> {
 }
 
 pub struct DeletePlan<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     owner: &'a Keypair,
     plan_pda: Pubkey,
 }
 
 impl<'a> DeletePlan<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
         Self { litesvm, owner, plan_pda }
     }
 
@@ -1132,7 +1127,7 @@ impl<'a> DeletePlan<'a> {
 }
 
 pub struct CreateSubscription<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     plan_pda: Pubkey,
     subscriber: Pubkey,
     mint: Pubkey,
@@ -1144,7 +1139,7 @@ pub struct CreateSubscription<'a> {
 
 impl<'a> CreateSubscription<'a> {
     pub fn new(
-        litesvm: &'a mut LiteSVM,
+        litesvm: &'a mut LiteSvmBackend,
         plan_pda: Pubkey,
         subscriber: Pubkey,
         mint: Pubkey,
@@ -1214,20 +1209,18 @@ impl<'a> CreateSubscription<'a> {
             )
         };
 
-        let lamports = self.litesvm.minimum_balance_for_rent_exemption(data.len());
-        self.litesvm
-            .set_account(
-                subscription_pda,
-                Account { lamports, data: data.to_vec(), owner: PROGRAM_ID, executable: false, rent_epoch: 0 },
-            )
-            .unwrap();
+        let lamports = rent_exempt_lamports(data.len());
+        self.litesvm.set_account(
+            &subscription_pda,
+            Account { lamports, data: data.to_vec(), owner: PROGRAM_ID, executable: false, rent_epoch: 0 },
+        );
 
         subscription_pda
     }
 }
 
 pub struct TransferSubscription<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     caller: &'a Keypair,
     delegator: Pubkey,
     mint: Pubkey,
@@ -1239,7 +1232,7 @@ pub struct TransferSubscription<'a> {
 
 impl<'a> TransferSubscription<'a> {
     pub fn new(
-        litesvm: &'a mut LiteSVM,
+        litesvm: &'a mut LiteSvmBackend,
         caller: &'a Keypair,
         delegator: Pubkey,
         mint: Pubkey,
@@ -1303,7 +1296,7 @@ impl<'a> TransferSubscription<'a> {
 }
 
 pub struct Subscribe<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     subscriber: &'a Keypair,
     merchant: Pubkey,
     plan_pda: Pubkey,
@@ -1315,7 +1308,7 @@ pub struct Subscribe<'a> {
 
 impl<'a> Subscribe<'a> {
     pub fn new(
-        litesvm: &'a mut LiteSVM,
+        litesvm: &'a mut LiteSvmBackend,
         subscriber: &'a Keypair,
         merchant: Pubkey,
         plan_pda: Pubkey,
@@ -1403,14 +1396,14 @@ impl<'a> Subscribe<'a> {
 }
 
 pub struct CancelSubscription<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     subscriber: &'a Keypair,
     plan_pda: Pubkey,
     subscription_pda: Pubkey,
 }
 
 impl<'a> CancelSubscription<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
         Self { litesvm, subscriber, plan_pda, subscription_pda }
     }
 
@@ -1435,14 +1428,14 @@ impl<'a> CancelSubscription<'a> {
 }
 
 pub struct ResumeSubscription<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     subscriber: &'a Keypair,
     plan_pda: Pubkey,
     subscription_pda: Pubkey,
 }
 
 impl<'a> ResumeSubscription<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
         Self { litesvm, subscriber, plan_pda, subscription_pda }
     }
 
@@ -1467,7 +1460,7 @@ impl<'a> ResumeSubscription<'a> {
 }
 
 pub fn setup_with_subscription() -> (
-    LiteSVM,
+    LiteSvmBackend,
     Keypair, // alice (subscriber)
     Keypair, // merchant
     Pubkey,  // mint
@@ -1483,7 +1476,7 @@ pub fn setup_with_subscription() -> (
 
     let (mut litesvm, alice) = setup();
     let merchant = Keypair::new();
-    litesvm.airdrop(&merchant.pubkey(), 10_000_000_000).unwrap();
+    litesvm.fund_sol(&merchant.pubkey(), 10_000_000_000);
 
     let mint = init_mint(&mut litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
     let _alice_ata = init_ata(&mut litesvm, mint, alice.pubkey(), 100_000_000);
@@ -1508,7 +1501,7 @@ pub fn setup_with_subscription() -> (
 }
 
 pub struct RevokeSubscription<'a> {
-    litesvm: &'a mut LiteSVM,
+    litesvm: &'a mut LiteSvmBackend,
     authority: &'a Keypair,
     subscription_pda: Pubkey,
     plan_pda: Pubkey,
@@ -1516,7 +1509,7 @@ pub struct RevokeSubscription<'a> {
 }
 
 impl<'a> RevokeSubscription<'a> {
-    pub fn new(litesvm: &'a mut LiteSVM, authority: &'a Keypair, subscription_pda: Pubkey, plan_pda: Pubkey) -> Self {
+    pub fn new(litesvm: &'a mut LiteSvmBackend, authority: &'a Keypair, subscription_pda: Pubkey, plan_pda: Pubkey) -> Self {
         Self { litesvm, authority, subscription_pda, plan_pda, receiver: None }
     }
 

@@ -20,7 +20,7 @@ use solana_signer::Signer;
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
 use crate::{
-    tests::{constants::TOKEN_PROGRAM_ID, utils::{get_ata_balance, TransferSubscription, World}},
+    tests::{constants::TOKEN_PROGRAM_ID, utils::{token_balance, TransferSubscription, World}},
     SubscriptionsError,
 };
 
@@ -71,7 +71,7 @@ fn transfer_subscription_the_authorization_alt() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "alt: authorized pull (merchant)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the authorized pull credited the merchant 10 tokens", 10_000_000, bal);
 
     // --- else: Caller not authorized --------------------------------------
@@ -88,6 +88,6 @@ fn transfer_subscription_the_authorization_alt() {
         .instruction();
     world.send_err(&[ix], &[&mallory], "else: unauthorized pull (mallory)", SubscriptionsError::Unauthorized);
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the refused pull moved nothing more — the merchant still holds only the authorized 10", 10_000_000, bal);
 }

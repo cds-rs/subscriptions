@@ -28,7 +28,7 @@ use tests_subscriptions::tests::{
     constants::{MINT_DECIMALS, PROGRAM_ID, TOKEN_PROGRAM_ID},
     pda::get_subscription_authority_pda,
     utils::{
-        get_ata_balance, init_ata, init_mint, initialize_subscription_authority_action, move_clock_forward,
+        token_balance, init_ata, init_mint, initialize_subscription_authority_action, move_clock_forward,
         CreateDelegation,
     },
 };
@@ -56,16 +56,16 @@ fn recurring_pull_and_the_soft_expiry_it_survives() {
     backend.fund_sol(&alice.pubkey(), 10_000_000_000);
     backend.fund_sol(&bob.pubkey(), 10_000_000_000);
 
-    let mint = init_mint(backend.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
-    init_ata(backend.svm_mut(), mint, alice.pubkey(), 100_000_000);
-    init_ata(backend.svm_mut(), mint, bob.pubkey(), 0);
+    let mint = init_mint(&mut backend, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
+    init_ata(&mut backend, mint, alice.pubkey(), 100_000_000);
+    init_ata(&mut backend, mint, bob.pubkey(), 0);
 
     // The merchant's recurring allowance: 50 tokens/hour, expiring in 10 minutes.
     md.step("Set the stage: Alice grants Bob a recurring allowance, expiring in 10 minutes");
-    initialize_subscription_authority_action(backend.svm_mut(), &alice, mint).0.assert_ok();
+    initialize_subscription_authority_action(&mut backend, &alice, mint).0.assert_ok();
     let amount_per_period: u64 = 50_000_000;
     let expiry_ts = NOW + 600; // 10 minutes
-    let (create_res, delegation_pda) = CreateDelegation::new(backend.svm_mut(), &alice, mint, bob.pubkey())
+    let (create_res, delegation_pda) = CreateDelegation::new(&mut backend, &alice, mint, bob.pubkey())
         .nonce(0)
         .recurring(amount_per_period, 3600, NOW, expiry_ts);
     create_res.assert_ok();
@@ -94,24 +94,24 @@ fn recurring_pull_and_the_soft_expiry_it_survives() {
 
     // --- Act 1: a normal pull, within the allowance, before expiry ----------
     md.step("Act 1: Bob pulls 10 tokens, within his allowance");
-    let bob_before = get_ata_balance(backend.svm(), &bob_ata);
+    let bob_before = token_balance(&backend, &bob_ata);
     let pull = pull_ix(&alice, &bob, mint, delegation_pda, subscription_authority_pda, event_authority);
     let r1 = backend.send(&[pull], &[&bob]);
     assert!(r1.error.is_none(), "the in-window pull should succeed: {:?}", r1.error);
     let r1: TransactionResult = r1.into();
-    let bob_after = get_ata_balance(backend.svm(), &bob_ata);
+    let bob_after = token_balance(&backend, &bob_ata);
     md.transition("bob's token balance", bob_before, bob_before + 10_000_000, bob_after, "the recurring pull reached the merchant");
     md.note(
         "The in-window pull, rendered five ways. Read the same transaction as a CPI tree, as a \
          sequence of messages (with and without lifelines), as an authority graph, and as an \
          ownership graph.",
     );
-    render_all(&mut md, &r1, backend.svm(), "Recurring pull");
+    render_all(&mut md, &r1, &backend, "Recurring pull");
 
     // --- Act 2: the same pull, 60s AFTER the stated expiry ------------------
     md.step("Act 2: the clock passes the stated expiry; Bob pulls again 60 seconds late");
     // Move to expiry + 60s (still inside the 120s drift window).
-    move_clock_forward(backend.svm_mut(), (expiry_ts - NOW + 60) as u64);
+    move_clock_forward(&mut backend, (expiry_ts - NOW + 60) as u64);
     let late = pull_ix(&alice, &bob, mint, delegation_pda, subscription_authority_pda, event_authority);
     let r2 = backend.send(&[late], &[&bob]);
     let late_succeeded = r2.error.is_none();
@@ -127,7 +127,7 @@ fn recurring_pull_and_the_soft_expiry_it_survives() {
 
     // --- Act 3: past the drift window, the pull is finally refused ----------
     md.step("Act 3: past the 120s drift window, the same pull is refused");
-    move_clock_forward(backend.svm_mut(), (TIME_DRIFT_ALLOWED_SECS + 5) as u64);
+    move_clock_forward(&mut backend, (TIME_DRIFT_ALLOWED_SECS + 5) as u64);
     let too_late = pull_ix(&alice, &bob, mint, delegation_pda, subscription_authority_pda, event_authority);
     let r3 = backend.send(&[too_late], &[&bob]);
     md.check("past the drift window the pull is refused", true, r3.error.is_some());

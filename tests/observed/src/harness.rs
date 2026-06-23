@@ -14,8 +14,7 @@
 //!     tree, the sequence diagram (with and without lifelines), and the
 //!     authority and ownership graphs.
 
-use litesvm_utils::{LiteSVM, LiteSvmBackend, MarkdownBlock, Report, TransactionResult};
-use solana_clock::Clock;
+use litesvm_utils::{LiteSVM, LiteSvmBackend, MarkdownBlock, Report, TestSVM, TransactionResult};
 
 use tests_subscriptions::tests::constants::PROGRAM_ID;
 
@@ -31,10 +30,9 @@ pub fn world() -> LiteSvmBackend {
     let so = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../target/deploy/subscriptions_program.so");
     svm.add_program_from_file(PROGRAM_ID.to_bytes(), so).unwrap();
-    let mut clock = svm.get_sysvar::<Clock>();
-    clock.unix_timestamp = NOW;
-    svm.set_sysvar::<Clock>(&clock);
-    LiteSvmBackend::new(svm)
+    let mut backend = LiteSvmBackend::new(svm);
+    backend.warp_to_timestamp(NOW);
+    backend
 }
 
 /// Append every render form of one transaction to the report, under a caption.
@@ -44,7 +42,7 @@ pub fn world() -> LiteSvmBackend {
 /// already `` ```mermaid ``-fenced fragments, so they go in verbatim as `Raw`
 /// (fencing them again would bury the diagram inside a text block, the report
 /// bug this crate's predecessor flushed out).
-pub fn render_all(md: &mut Report, result: &TransactionResult, _svm: &LiteSVM, caption: &str) {
+pub fn render_all(md: &mut Report, result: &TransactionResult, _backend: &LiteSvmBackend, caption: &str) {
     md.block(
         format!("{caption}: structured CPI tree"),
         MarkdownBlock::Fenced { lang: "text".into(), body: result.logs_structured_string() },

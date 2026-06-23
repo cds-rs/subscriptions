@@ -6,6 +6,8 @@
 //! and pulls against it through the observed `send_*`. Every send renders its
 //! surface into the test's report under `target/md-reports/`.
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     event_engine::event_authority_pda,
     instructions::transfer_recurring_delegation,
@@ -15,7 +17,7 @@ use crate::{
         idl,
         pda::get_subscription_authority_pda,
         utils::{
-            days, get_ata_balance, hours, init_aux_token_account, init_mint, minutes,
+            days, token_balance, hours, init_aux_token_account, init_mint, minutes,
             CloseSubscriptionAuthority, CreateDelegation, ObservedResultExt, TransferDelegation, World,
         },
     },
@@ -78,7 +80,7 @@ fn test_recurring_transfer_success() {
     let (alice, bob, delegation_pda, mint, _, bob_ata, _) =
         setup_recurring_delegation(&mut world, amount_per_period, period_length_s, start_ts, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls 10 tokens in period 0");
@@ -88,7 +90,7 @@ fn test_recurring_transfer_success() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (pull 1)");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -105,7 +107,7 @@ fn test_recurring_transfer_success() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (pull 2)");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received another 10 tokens", 20_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -120,7 +122,7 @@ fn test_recurring_transfer_success() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (pull 3)");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received a third 10 tokens", 30_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -157,7 +159,7 @@ fn test_recurring_transfer_exceeds_period_limit() {
         SubscriptionsError::AmountExceedsPeriodLimit,
     );
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA is still empty", 0, bob_balance);
 }
 
@@ -176,7 +178,7 @@ fn test_recurring_transfer_expired() {
     let (alice, bob, delegation_pda, mint, _, bob_ata, _) =
         setup_recurring_delegation(&mut world, amount_per_period, period_length_s, start_ts, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls 30 tokens within the window");
@@ -185,7 +187,7 @@ fn test_recurring_transfer_expired() {
         .amount(transfer_amount)
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (within window)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 30 tokens", 30_000_000, bob_balance);
 
     world.md().step("The clock advances past expiry; a further pull is refused");
@@ -197,7 +199,7 @@ fn test_recurring_transfer_expired() {
         .amount(transfer_amount)
         .recurring_ix();
     world.send_err(&[ix], &[&bob], "TransferRecurring (expired)", SubscriptionsError::DelegationExpired);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's balance is unchanged", 30_000_000, bob_balance);
 }
 
@@ -216,7 +218,7 @@ fn test_recurring_transfer_multiple_periods() {
     let (alice, bob, delegation_pda, mint, _, bob_ata, _) =
         setup_recurring_delegation(&mut world, amount_per_period, period_length_s, start_ts, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls 30 tokens in period 0");
@@ -225,7 +227,7 @@ fn test_recurring_transfer_multiple_periods() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 0)");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 30 tokens", 30_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -241,7 +243,7 @@ fn test_recurring_transfer_multiple_periods() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 1)");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received another 30 tokens", 60_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -265,7 +267,7 @@ fn test_recurring_transfer_skip_multiple_periods() {
     let (alice, bob, delegation_pda, mint, _, bob_ata, _) =
         setup_recurring_delegation(&mut world, amount_per_period, period_length_s, start_ts, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Period 0: Bob pulls 10 tokens");
@@ -273,7 +275,7 @@ fn test_recurring_transfer_skip_multiple_periods() {
         .amount(10_000_000)
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 0)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 
     world.md().step("Three periods are skipped; Bob pulls again in period 3");
@@ -284,7 +286,7 @@ fn test_recurring_transfer_skip_multiple_periods() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 3)");
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received another 10 tokens", 20_000_000, bob_balance);
 
     let delegation_account = world.svm().get_account(&delegation_pda).unwrap();
@@ -326,7 +328,7 @@ fn test_recurring_transfer_skip_period_cannot_double_claim() {
         .amount(amount_per_period)
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 0, full)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received the full 50 tokens", 50_000_000, bob_balance);
 
     world.md().step("Period 1 is skipped entirely; advance to the start of period 2");
@@ -337,7 +339,7 @@ fn test_recurring_transfer_skip_period_cannot_double_claim() {
         .amount(amount_per_period)
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 2, full)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received another full 50 tokens", 100_000_000, bob_balance);
 
     world.md().step("Period 2: Bob immediately tries to claim again; it is refused");
@@ -352,7 +354,7 @@ fn test_recurring_transfer_skip_period_cannot_double_claim() {
     );
 
     // Balances unchanged after failed transfer
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's balance is unchanged after the refused claim", 100_000_000, bob_balance);
 
     // Verify delegation state
@@ -404,8 +406,8 @@ fn recurring_delegation_rejects_transfer_with_different_mint_authority() {
         .recurring_ix();
     world.send_err(&[ix], &[&bob], "TransferRecurring (mismatched mint)", SubscriptionsError::InvalidDelegatePda);
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_high_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_high_ata);
+    let alice_balance = token_balance(world.svm(), &alice_high_ata);
+    let bob_balance = token_balance(world.svm(), &bob_high_ata);
     world.md().check("Alice's high-value ATA is untouched", 100_000_000, alice_balance);
     world.md().check("Bob's high-value ATA is empty", 0, bob_balance);
 
@@ -456,9 +458,9 @@ fn recurring_transfer_rejects_approved_non_canonical_source() {
         SubscriptionsError::InvalidAssociatedTokenAccountDerivedAddress,
     );
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let alice_aux_balance = get_ata_balance(world.svm(), &alice_aux);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let alice_aux_balance = token_balance(world.svm(), &alice_aux);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA is untouched", 100_000_000, alice_balance);
     world.md().check("Alice's aux account is untouched", 100_000_000, alice_aux_balance);
     world.md().check("Bob's ATA is empty", 0, bob_balance);
@@ -630,8 +632,8 @@ fn test_recurring_transfer_delegator_mismatch_exploit() {
     // After the fix, this should fail with Unauthorized error
     world.send_err(&[ix], &[&bob], "TransferRecurring (delegator mismatch)", SubscriptionsError::Unauthorized);
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's funds are untouched", 100_000_000, alice_balance);
     world.md().check("Bob received no funds", 0, bob_balance);
 }
@@ -651,7 +653,7 @@ fn test_recurring_transfer_token_revoke() {
     let (alice, bob, delegation_pda, mint, alice_ata, bob_ata, subscription_authority_pda) =
         setup_recurring_delegation(&mut world, amount_per_period, period_length_s, start_ts, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls the full 50 tokens in period 0");
@@ -659,7 +661,7 @@ fn test_recurring_transfer_token_revoke() {
         .amount(50_000_000)
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 0)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 50 tokens", 50_000_000, bob_balance);
 
     world.md().step("Alice revokes the SPL token approval over her ATA");
@@ -755,7 +757,7 @@ fn test_recurring_transfer_to_third_party() {
     world.send_ok(&[ix], &[&bob], "TransferRecurring (to third party)");
 
     // Verify Charlie received funds
-    let charlie_balance = get_ata_balance(world.svm(), &charlie_ata);
+    let charlie_balance = token_balance(world.svm(), &charlie_ata);
     world.md().check("Charlie received 10 tokens", 10_000_000, charlie_balance);
 }
 
@@ -777,14 +779,14 @@ fn test_recurring_transfer_version_mismatch() {
     world.md().step("The delegation's header version byte is corrupted to 0");
     let mut account = world.svm().get_account(&delegation_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(delegation_pda, account).unwrap();
+    world.svm_mut().set_account(&delegation_pda, account);
 
     world.md().step("Bob pulls against the stale delegation; migration is required");
     let ix = TransferDelegation::new(world.svm_mut(), &bob, alice.pubkey(), mint, delegation_pda)
         .amount(10_000_000)
         .recurring_ix();
     world.send_err(&[ix], &[&bob], "TransferRecurring (version mismatch)", SubscriptionsError::MigrationRequired);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA is empty", 0, bob_balance);
 }
 
@@ -816,8 +818,8 @@ fn test_recurring_transfer_stale_subscription_authority() {
         .amount(10_000_000)
         .recurring_ix();
     world.send_err(&[ix], &[&bob], "TransferRecurring (stale authority)", SubscriptionsError::StaleSubscriptionAuthority);
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's funds are untouched", 100_000_000, alice_balance);
     world.md().check("Bob's ATA is empty", 0, bob_balance);
 }
@@ -837,7 +839,7 @@ fn test_recurring_transfer_not_started() {
     let (alice, bob, delegation_pda, mint, _, bob_ata, _) =
         setup_recurring_delegation(&mut world, amount_per_period, period_length_s, start_ts, expiry_ts, nonce);
 
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA starts empty", 0, bob_balance);
 
     world.md().step("Bob pulls before the start time; it is refused");
@@ -846,7 +848,7 @@ fn test_recurring_transfer_not_started() {
         .amount(transfer_amount)
         .recurring_ix();
     world.send_err(&[ix], &[&bob], "TransferRecurring (not started)", SubscriptionsError::DelegationNotStarted);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's ATA is still empty", 0, bob_balance);
 
     world.md().step("The clock passes the start time; Bob's pull now succeeds");
@@ -856,7 +858,7 @@ fn test_recurring_transfer_not_started() {
         .amount(transfer_amount)
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (after start)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received 10 tokens", transfer_amount, bob_balance);
 }
 
@@ -905,7 +907,7 @@ fn test_recurring_rollover_blocked_at_expiry_boundary() {
         .amount(amount_per_period)
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring (period 0)");
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob received the full allowance", amount_per_period, bob_balance);
 
     world.md().step("A period elapses, landing exactly at expiry; the rollover pull is refused");
@@ -920,7 +922,7 @@ fn test_recurring_rollover_blocked_at_expiry_boundary() {
         "TransferRecurring (rollover at expiry)",
         SubscriptionsError::AmountExceedsPeriodLimit,
     );
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Bob's balance is unchanged", amount_per_period, bob_balance);
 }
 
@@ -990,8 +992,8 @@ fn test_recurring_transfer_token_2022_transfer_fee() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring");
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA debited the gross 10 tokens", 90_000_000, alice_balance);
     world.md().check("Bob received 10 tokens net of the 1% fee", 9_900_000, bob_balance);
 
@@ -1040,8 +1042,8 @@ fn test_recurring_transfer_token_2022_confidential_transfer_public_balance() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring");
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA debited 10 tokens", 90_000_000, alice_balance);
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 }
@@ -1086,8 +1088,8 @@ fn test_recurring_transfer_token_2022_unconfigured_transfer_hook() {
         .recurring_ix();
     world.send_ok(&[ix], &[&bob], "TransferRecurring");
 
-    let alice_balance = get_ata_balance(world.svm(), &alice_ata);
-    let bob_balance = get_ata_balance(world.svm(), &bob_ata);
+    let alice_balance = token_balance(world.svm(), &alice_ata);
+    let bob_balance = token_balance(world.svm(), &bob_ata);
     world.md().check("Alice's ATA debited 10 tokens", 90_000_000, alice_balance);
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 }

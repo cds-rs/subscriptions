@@ -9,6 +9,8 @@ use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     tests::utils::{
             days, hours, init_mint, CancelSubscription, CreateDelegation, CreateSubscription, ObservedResultExt,
@@ -440,7 +442,7 @@ fn test_revoke_fixed_version_agnostic() {
 
     let mut account = world.svm().get_account(&delegation_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(delegation_pda, account).unwrap();
+    world.svm_mut().set_account(&delegation_pda, account);
 
     world.md().step("Alice revokes a delegation with a zeroed version byte");
     let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).instruction();
@@ -479,7 +481,7 @@ fn test_revoke_recurring_version_agnostic() {
 
     let mut account = world.svm().get_account(&delegation_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(delegation_pda, account).unwrap();
+    world.svm_mut().set_account(&delegation_pda, account);
 
     world.md().step("Alice revokes a delegation with a zeroed version byte");
     let ix = RevokeDelegation::new(world.svm_mut(), &alice, mint, delegatee, nonce).instruction();
@@ -507,7 +509,7 @@ fn test_revoke_subscription_version_mismatch() {
 
     let mut account = world.svm().get_account(&s.subscription_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(s.subscription_pda, account).unwrap();
+    world.svm_mut().set_account(&s.subscription_pda, account);
 
     world.md().step("Alice tries to revoke a subscription with a zeroed version byte");
     let ix = RevokeSubscription::new(world.svm_mut(), &s.alice, s.subscription_pda, s.plan_pda).instruction();

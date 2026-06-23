@@ -11,7 +11,7 @@
 use solana_signer::Signer;
 
 use crate::tests::utils::{
-    days, get_ata_balance, hours, CreateDelegation, ObservedResultExt, TransferDelegation, World,
+    days, token_balance, hours, CreateDelegation, ObservedResultExt, TransferDelegation, World,
 };
 
 #[test]
@@ -40,7 +40,7 @@ fn finding_3_1_1_recurring_pull_before_start_ts() {
     world.prop(delegation_pda, "Delegation (starts tomorrow)");
     world.send_ok(&[create_ix], &[&alice], "CreateRecurringDelegation");
 
-    let bob_before = get_ata_balance(world.svm(), &bob_ata);
+    let bob_before = token_balance(world.svm(), &bob_ata);
 
     // The exploit: pull NOW, a full day before start_ts.
     world.md().step("Bob pulls 10 tokens NOW — a day before the delegation begins");
@@ -49,7 +49,7 @@ fn finding_3_1_1_recurring_pull_before_start_ts() {
         .recurring_ix();
     let res = world.send(&[pull_ix], &[&bob], "TransferRecurring (before start_ts)");
     let exploit_succeeded = res.is_success();
-    let bob_after = get_ata_balance(world.svm(), &bob_ata);
+    let bob_after = token_balance(world.svm(), &bob_ata);
 
     world.md().note(
         "Finding 3.1.1: the delegation's start_ts is a day in the future, yet the pull above lands now. \

@@ -8,6 +8,8 @@
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     tests::utils::{
             hours, CloseSubscriptionAuthority, CreateDelegation, ObservedResultExt,

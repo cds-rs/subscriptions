@@ -20,7 +20,7 @@ use crate::{
     tests::{
         pda::{get_plan_pda, get_subscription_pda},
         utils::{
-            days, get_ata_balance, hours, CreatePlan, DeletePlan, ObservedResultExt, Subscribe,
+            days, token_balance, hours, CreatePlan, DeletePlan, ObservedResultExt, Subscribe,
             TransferSubscription, UpdatePlan, World,
         },
     },
@@ -97,7 +97,7 @@ fn finding_3_1_2_ghost_plan_inflated_amount_drains() {
     // Alice consented to 1000/hour; the ghost plan sets 100M/hour.
     let g = stage_and_recreate(&mut world, 1_000, 100_000_000, 60);
 
-    let alice_before = get_ata_balance(world.svm(), &g.alice_ata);
+    let alice_before = token_balance(world.svm(), &g.alice_ata);
     world.md().step("The merchant pulls 50M — 50,000x what Alice agreed to");
     let pull_ix = TransferSubscription::new(world.svm_mut(), &g.merchant, g.alice.pubkey(), g.mint, g.subscription_pda, g.plan_pda)
         .amount(50_000_000)
@@ -105,8 +105,8 @@ fn finding_3_1_2_ghost_plan_inflated_amount_drains() {
         .instruction();
     let res = world.send(&[pull_ix], &[&g.merchant], "TransferSubscription (ghost-plan drain)");
     let drained = res.is_success();
-    let alice_after = get_ata_balance(world.svm(), &g.alice_ata);
-    let merchant_got = get_ata_balance(world.svm(), &g.merchant_ata);
+    let alice_after = token_balance(world.svm(), &g.alice_ata);
+    let merchant_got = token_balance(world.svm(), &g.merchant_ata);
 
     world.md().note(
         "Finding 3.1.2: Alice consented to 1000/hour, but the merchant deleted and recreated the plan at \
@@ -136,7 +136,7 @@ fn finding_3_1_4_ghost_plan_extended_end_ts_siphons() {
         .instruction();
     let res = world.send(&[pull_ix], &[&g.merchant], "TransferSubscription (past original end)");
     let siphoned = res.is_success();
-    let merchant_got = get_ata_balance(world.svm(), &g.merchant_ata);
+    let merchant_got = token_balance(world.svm(), &g.merchant_ata);
 
     world.md().note(
         "Finding 3.1.4: the original plan ended an hour ago, but the merchant recreated it with a 60-day \

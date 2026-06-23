@@ -7,6 +7,8 @@
 
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     state::common::PlanStatus,
     tests::{

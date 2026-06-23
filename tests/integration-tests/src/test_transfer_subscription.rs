@@ -15,6 +15,8 @@ use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     event_engine::event_authority_pda,
     state::{plan::Plan, subscription_delegation::SubscriptionDelegation},
@@ -22,7 +24,7 @@ use crate::{
         constants::{PROGRAM_ID, TOKEN_PROGRAM_ID},
         pda::{get_plan_pda, get_subscription_authority_pda},
         utils::{
-            days, get_ata_balance, hours, init_ata, CancelSubscription, CreatePlan, CreateSubscription,
+            days, token_balance, hours, init_ata, CancelSubscription, CreatePlan, CreateSubscription,
             DeletePlan, ObservedResultExt, TransferSubscription, UpdatePlan, World,
         },
     },
@@ -103,7 +105,7 @@ fn test_transfer_subscription_success() {
     let (alice, merchant, mint, plan_pda, _, subscription_pda, _, merchant_ata) =
         setup_plan_and_subscription(&mut world, amount_per_period, period_hours, end_ts, vec![], vec![]);
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant ATA starts empty", 0, bal);
 
     let transfer_amount = 10_000_000u64;
@@ -113,7 +115,7 @@ fn test_transfer_subscription_success() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant received 10 tokens", 10_000_000, bal);
 
     // Verify subscription state was updated.
@@ -152,7 +154,7 @@ fn test_transfer_subscription_puller_authorized() {
         .instruction();
     world.send_ok(&[ix], &[&puller], "TransferSubscription (authorized puller)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant received 10 tokens", 10_000_000, bal);
 }
 
@@ -202,7 +204,7 @@ fn test_transfer_subscription_multiple_pulls_within_period() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (first pull)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant has 20 tokens", 20_000_000, bal);
 
     // Second pull.
@@ -212,7 +214,7 @@ fn test_transfer_subscription_multiple_pulls_within_period() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (second pull)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant has 40 tokens", 40_000_000, bal);
 
     // Verify pulled amount.
@@ -245,7 +247,7 @@ fn test_transfer_subscription_exceeds_period_limit() {
         "TransferSubscription (exceeds period limit)",
         SubscriptionsError::AmountExceedsPeriodLimit,
     );
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant ATA is still empty", 0, bal);
 }
 
@@ -270,7 +272,7 @@ fn test_transfer_subscription_period_rollover() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (period 1)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant has the full period", 50_000_000, bal);
 
     // Move to next period.
@@ -284,7 +286,7 @@ fn test_transfer_subscription_period_rollover() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (period 2)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant total is 80 tokens", 80_000_000, bal);
 
     // Verify pulled reset.
@@ -381,7 +383,7 @@ fn test_transfer_subscription_cancelled_allows_current_period() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (current period)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant received 10 tokens", 10_000_000, bal);
 }
 
@@ -446,7 +448,7 @@ fn test_transfer_subscription_destination_valid() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (valid destination)");
 
-    let bal = get_ata_balance(world.svm(), &dest_ata);
+    let bal = token_balance(world.svm(), &dest_ata);
     world.md().check("the destination received 10 tokens", 10_000_000, bal);
 }
 
@@ -508,7 +510,7 @@ fn test_transfer_subscription_no_destinations_any_receiver() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (any receiver)");
 
-    let bal = get_ata_balance(world.svm(), &charlie_ata);
+    let bal = token_balance(world.svm(), &charlie_ata);
     world.md().check("Charlie received 10 tokens", 10_000_000, bal);
 }
 
@@ -611,7 +613,7 @@ fn test_transfer_subscription_sunset_allows_transfer() {
     // Plan layout: discriminator(1) + owner(32) + bump(1) + status(1) + data(...)
     // status is at offset 34
     plan_account.data[34] = 0; // PlanStatus::Sunset
-    world.svm_mut().set_account(plan_pda, plan_account).unwrap();
+    world.svm_mut().set_account(&plan_pda, plan_account);
 
     world.md().step("Despite the sunset status, the merchant pulls 10 tokens");
     let ix = TransferSubscription::new(world.svm_mut(), &merchant, alice.pubkey(), mint, subscription_pda, plan_pda)
@@ -619,7 +621,7 @@ fn test_transfer_subscription_sunset_allows_transfer() {
         .instruction();
     world.send_ok(&[ix], &[&merchant], "TransferSubscription (sunset plan)");
 
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant received 10 tokens", 10_000_000, bal);
 }
 
@@ -643,7 +645,7 @@ fn test_transfer_subscription_plan_closed() {
     let mut plan_account = world.svm().get_account(&plan_pda).unwrap();
     plan_account.data = vec![];
     plan_account.owner = Pubkey::default(); // system program
-    world.svm_mut().set_account(plan_pda, plan_account).unwrap();
+    world.svm_mut().set_account(&plan_pda, plan_account);
 
     world.md().step("The merchant pulls against the closed plan account");
     let ix = TransferSubscription::new(world.svm_mut(), &merchant, alice.pubkey(), mint, subscription_pda, plan_pda)
@@ -795,7 +797,7 @@ fn test_subscription_transfer_version_mismatch() {
 
     let mut account = world.svm().get_account(&subscription_pda).unwrap();
     account.data[VERSION_OFFSET] = 0;
-    world.svm_mut().set_account(subscription_pda, account).unwrap();
+    world.svm_mut().set_account(&subscription_pda, account);
 
     world.md().step("The merchant pulls against a version-mismatched subscription");
     let ix = TransferSubscription::new(world.svm_mut(), &merchant, alice.pubkey(), mint, subscription_pda, plan_pda)
@@ -807,7 +809,7 @@ fn test_subscription_transfer_version_mismatch() {
         "TransferSubscription (version mismatch)",
         SubscriptionsError::MigrationRequired,
     );
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant ATA is still empty", 0, bal);
 }
 
@@ -845,7 +847,7 @@ fn test_subscription_transfer_stale_subscription_authority() {
         "TransferSubscription (stale authority)",
         SubscriptionsError::StaleSubscriptionAuthority,
     );
-    let bal = get_ata_balance(world.svm(), &merchant_ata);
+    let bal = token_balance(world.svm(), &merchant_ata);
     world.md().check("the merchant ATA is still empty", 0, bal);
 }
 

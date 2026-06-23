@@ -9,9 +9,11 @@
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     tests::utils::{as_pubkey, 
-            days, get_ata_balance, CloseSubscriptionAuthority, CreateDelegation,
+            days, token_balance, CloseSubscriptionAuthority, CreateDelegation,
             ObservedResultExt, TransferDelegation, World,
         },
     AccountDiscriminator, RecurringDelegation, SubscriptionsError,
@@ -312,7 +314,7 @@ fn create_recurring_delegation_with_sentinel_start_starts_at_landing() {
         .recurring_ix();
     world.send_ok(&[transfer_ix], &[&bob], "TransferRecurring");
 
-    let bob_balance = get_ata_balance(world.svm(), &delegatee_ata);
+    let bob_balance = token_balance(world.svm(), &delegatee_ata);
     world.md().check("the pulled amount landed in Bob's ATA", transfer_amount, bob_balance);
 }
 
@@ -434,6 +436,6 @@ fn create_recurring_delegation_with_zero_expiry() {
         .recurring_ix();
     world.send_ok(&[transfer_ix], &[&bob], "TransferRecurring");
 
-    let bob_balance = get_ata_balance(world.svm(), &delegatee_ata);
+    let bob_balance = token_balance(world.svm(), &delegatee_ata);
     world.md().check("the pulled amount landed in Bob's ATA", transfer_amount, bob_balance);
 }

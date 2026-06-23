@@ -13,6 +13,8 @@ use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use spl_token_2022_interface::extension::ExtensionType;
 
+use litesvm_utils::TestSVM;
+
 use crate::{
     instructions::initialize_subscription_authority,
     tests::{
@@ -290,10 +292,9 @@ fn initialize_subscription_authority_with_prefunded_pda() {
     let (subscription_authority_pda, _) = get_subscription_authority_pda(&alice.pubkey(), &mint);
     world.svm_mut()
         .set_account(
-            subscription_authority_pda,
+            &subscription_authority_pda,
             Account { lamports: 1_000, data: vec![], owner: Pubkey::default(), executable: false, rent_epoch: 0 },
-        )
-        .unwrap();
+        );
 
     world.md().step("Despite the pre-funded PDA, Alice initializes her authority");
     let (res, _, bump) = world.init_authority(&alice, mint, None);
@@ -328,10 +329,9 @@ fn initialize_subscription_authority_with_overfunded_pda() {
     let (subscription_authority_pda, _) = get_subscription_authority_pda(&alice.pubkey(), &mint);
     world.svm_mut()
         .set_account(
-            subscription_authority_pda,
+            &subscription_authority_pda,
             Account { lamports: 10_000_000, data: vec![], owner: Pubkey::default(), executable: false, rent_epoch: 0 },
-        )
-        .unwrap();
+        );
 
     world.md().step("Despite the over-funded PDA, Alice initializes her authority");
     let (res, _, bump) = world.init_authority(&alice, mint, None);
