@@ -2,6 +2,7 @@
 members = [
     "program",
     "clients/rust",
+    "scenarios",
     "tests/integration-tests",
     "tests/observed",
 ]
