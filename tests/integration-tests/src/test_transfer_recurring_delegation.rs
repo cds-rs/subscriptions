@@ -18,7 +18,7 @@ use crate::{
         pda::get_subscription_authority_pda,
         utils::{
             days, token_balance, hours, init_aux_token_account, init_mint, minutes,
-            CloseSubscriptionAuthority, CreateDelegation, ObservedResultExt, TransferDelegation, make_backend, ModelTxExt, World,
+            CloseSubscriptionAuthority, CreateDelegation, ObservedResultExt, TransferDelegation, make_backend, World,
         },
     },
     SubscriptionsError,

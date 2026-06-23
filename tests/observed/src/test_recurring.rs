@@ -23,14 +23,16 @@ use subscriptions::{
     event_engine::{event_authority_pda, EMIT_EVENT_IX_DISC, EVENT_IX_TAG_LE},
     instructions::transfer_recurring_delegation,
 };
-use tests_subscriptions::tests::{
-    asserts::TransactionResultExt,
-    constants::{MINT_DECIMALS, PROGRAM_ID, TOKEN_PROGRAM_ID},
-    pda::get_subscription_authority_pda,
-    utils::{
-        token_balance, init_ata, init_mint, initialize_subscription_authority_action, move_clock_forward,
-        CreateDelegation,
+use tests_subscriptions::{
+    tests::{
+        constants::{MINT_DECIMALS, PROGRAM_ID, TOKEN_PROGRAM_ID},
+        pda::get_subscription_authority_pda,
+        utils::{
+            token_balance, init_ata, init_mint, initialize_subscription_authority_action, move_clock_forward,
+            CreateDelegation,
+        },
     },
+    utils::ObservedResultExt,
 };
 
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;

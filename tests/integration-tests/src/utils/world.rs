@@ -39,7 +39,7 @@ use litesvm_utils::{
 };
 use solana_instruction::{AccountMeta, Instruction};
 
-use crate::tests::utils::ModelTxExt;
+
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
 use crate::{
@@ -416,13 +416,13 @@ fn pk(raw: &[u8]) -> String {
 /// Ergonomic assertions on the observed (engine-neutral) result, mirroring the
 /// suite's `TransactionResultExt` so converted tests read the same: `.assert_ok()`
 /// / `.assert_err(SubscriptionsError::X)`. These bridge the domain error enum
-/// onto the neutral [`ModelTxExt`] primitives (`assert_success` /
+/// onto the inherent `testsvm::model::Transaction` methods (`assert_success` /
 /// `assert_error_code`), so the World path asserts against `model::Transaction`
 /// without ever holding a litesvm `TransactionResult`.
 ///
-/// Hoist-to-testsvm note: `ModelTxExt` is the engine-neutral half and belongs
-/// upstream; this trait stays suite-local because it is wired to the
-/// subscriptions error enum.
+/// This trait stays suite-local because it is wired to the subscriptions error
+/// enum; `assert_success`/`assert_error_code` are inherent on
+/// `testsvm::model::Transaction` and need no import.
 pub trait ObservedResultExt {
     /// Assert the transaction succeeded; returns the result for chaining.
     fn assert_ok(self) -> Self;

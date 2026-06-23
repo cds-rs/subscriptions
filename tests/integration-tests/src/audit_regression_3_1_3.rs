@@ -13,7 +13,7 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use crate::tests::{pda::get_subscription_authority_pda, utils::{make_backend, ModelTxExt, World}};
+use crate::tests::{pda::get_subscription_authority_pda, utils::{make_backend, World}};
 
 #[test]
 fn finding_3_1_3_prefunded_pda_blocks_creation() {

@@ -23,7 +23,7 @@ use crate::{
         pda::get_subscription_authority_pda,
         utils::{as_pubkey, 
             fetch_account, init_aux_token_account, init_mint, set_transfer_hook_config, ObservedResultExt,
-            make_backend, ModelTxExt, World,
+            make_backend, World,
         },
     },
     AccountDiscriminator, SubscriptionAuthority, SubscriptionsError,

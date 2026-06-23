@@ -14,7 +14,7 @@ use litesvm_utils::{LiteSvmBackend, TestSVM};
 use crate::{
     tests::utils::{
             days, hours, init_mint, CancelSubscription, CreateDelegation, CreateSubscription, ObservedResultExt,
-            RevokeDelegation, RevokeSubscription, make_backend, ModelTxExt, World,
+            RevokeDelegation, RevokeSubscription, make_backend, World,
         },
     AccountDiscriminator, FixedDelegation, RecurringDelegation, SubscriptionsError,
 };

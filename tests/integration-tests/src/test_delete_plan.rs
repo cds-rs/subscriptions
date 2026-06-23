@@ -13,7 +13,7 @@ use crate::{
     state::common::PlanStatus,
     tests::{
         constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
-        utils::{days, init_mint, CreatePlan, DeletePlan, UpdatePlan, make_backend, ModelTxExt, World},
+        utils::{days, init_mint, CreatePlan, DeletePlan, UpdatePlan, make_backend, World},
     },
     SubscriptionsError,
 };

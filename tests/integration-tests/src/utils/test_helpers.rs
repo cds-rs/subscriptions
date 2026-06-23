@@ -47,7 +47,6 @@ use crate::{
     tests::{
         constants::{PROGRAM_ID, SYSTEM_PROGRAM_ID},
         pda::{get_delegation_pda, get_plan_pda, get_subscription_authority_pda, get_subscription_pda},
-        utils::ModelTxExt,
     },
 };
 

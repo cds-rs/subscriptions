@@ -19,7 +19,7 @@ use crate::{
         utils::{
             days, token_balance, init_aux_token_account, init_mint, install_transfer_hook_extra_metas,
             load_transfer_hook_example, set_transfer_hook_config, CloseSubscriptionAuthority, CreateDelegation,
-            ObservedResultExt, RevokeDelegation, TransferDelegation, make_backend, ModelTxExt, World, TRANSFER_HOOK_EXAMPLE_PROGRAM_ID,
+            ObservedResultExt, RevokeDelegation, TransferDelegation, make_backend, World, TRANSFER_HOOK_EXAMPLE_PROGRAM_ID,
         },
     },
     SubscriptionsError,

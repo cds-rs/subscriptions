@@ -3,11 +3,10 @@ pub use subscriptions::*;
 pub mod utils;
 
 pub mod tests {
-    pub use crate::utils::{asserts, constants, cu_tracker, idl, pda};
+    pub use crate::utils::{constants, cu_tracker, idl, pda};
 
     pub mod utils {
         pub use crate::utils::test_helpers::*;
-        pub use crate::utils::tx_assert::ModelTxExt;
         pub use crate::utils::world::{as_pubkey, make_backend, ObservedResultExt, StagedSubscription, World};
     }
 }

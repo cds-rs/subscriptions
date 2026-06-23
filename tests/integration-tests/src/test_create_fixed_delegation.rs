@@ -16,7 +16,7 @@ use crate::{
         pda::get_delegation_pda,
         utils::{as_pubkey, 
             days, token_balance, CloseSubscriptionAuthority, CreateDelegation,
-            ObservedResultExt, RevokeDelegation, TransferDelegation, make_backend, ModelTxExt, World,
+            ObservedResultExt, RevokeDelegation, TransferDelegation, make_backend, World,
         },
     },
     AccountDiscriminator, FixedDelegation, SubscriptionsError,
@@ -347,17 +347,17 @@ fn create_multiple_delegations_different_nonces() {
     let (ix0, pda0) =
         { CreateDelegation::new(world.svm_mut(), &payer, mint, delegatee).nonce(0).fixed_ix(100, now + 1000) };
     let tx = world.send_ok(&[ix0], &[&payer], "CreateFixedDelegation (nonce 0)");
-    println!("Create Fixed delegation consumed: {} CUs", tx.compute_units());
+    println!("Create Fixed delegation consumed: {} CUs", tx.compute_units);
 
     let (ix1, pda1) =
         { CreateDelegation::new(world.svm_mut(), &payer, mint, delegatee).nonce(1).fixed_ix(200, now + 2000) };
     let tx = world.send_ok(&[ix1], &[&payer], "CreateFixedDelegation (nonce 1)");
-    println!("Create Fixed delegation consumed: {} CUs", tx.compute_units());
+    println!("Create Fixed delegation consumed: {} CUs", tx.compute_units);
 
     let (ix2, pda2) =
         { CreateDelegation::new(world.svm_mut(), &payer, mint, delegatee).nonce(2).fixed_ix(300, now + 3000) };
     let tx = world.send_ok(&[ix2], &[&payer], "CreateFixedDelegation (nonce 2)");
-    println!("Create Fixed delegation consumed: {} CUs", tx.compute_units());
+    println!("Create Fixed delegation consumed: {} CUs", tx.compute_units);
 
     assert_ne!(pda0, pda1);
     assert_ne!(pda1, pda2);

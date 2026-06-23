@@ -22,7 +22,7 @@ use crate::{
         pda::{get_plan_pda, get_subscription_pda},
         utils::{
             days, token_balance, hours, CreatePlan, DeletePlan, ObservedResultExt, Subscribe,
-            TransferSubscription, UpdatePlan, make_backend, ModelTxExt, World,
+            TransferSubscription, UpdatePlan, make_backend, World,
         },
     },
 };

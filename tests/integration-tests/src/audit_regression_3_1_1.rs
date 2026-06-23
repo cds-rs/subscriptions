@@ -11,7 +11,7 @@
 use solana_signer::Signer;
 
 use crate::tests::utils::{
-    days, token_balance, hours, CreateDelegation, ObservedResultExt, TransferDelegation, make_backend, ModelTxExt, World,
+    days, token_balance, hours, CreateDelegation, ObservedResultExt, TransferDelegation, make_backend, World,
 };
 
 #[test]
