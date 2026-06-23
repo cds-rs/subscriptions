@@ -915,6 +915,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "comfy-table"
+version = "7.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "958c5d6ecf1f214b4c2bbbbf6ab9523a864bd136dcf71a7e8904799acfe1ad47"
+dependencies = [
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "compression-codecs"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2174,7 +2184,7 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 [[package]]
 name = "litesvm"
 version = "0.12.0"
-source = "git+https://github.com/cds-rs/litesvm?branch=main#e5dcddc71c32a3475345039b069c08afee7b06c8"
+source = "git+https://github.com/cds-rs/litesvm?rev=03bb2ff3e49321b9d62c7f91b4d0d6c1548b8be6#03bb2ff3e49321b9d62c7f91b4d0d6c1548b8be6"
 dependencies = [
  "agave-feature-set",
  "agave-reserved-account-keys",
@@ -2260,12 +2270,12 @@ dependencies = [
 [[package]]
 name = "litesvm-utils"
 version = "0.4.0"
-source = "git+https://github.com/cds-rs/anchor-litesvm?branch=turbin3#c45d76bd5ac998ca0913282cf807a4c3536731a5"
 dependencies = [
  "base64 0.22.1",
  "indexmap 2.14.0",
  "litesvm",
  "solana-account",
+ "solana-compute-budget",
  "solana-keypair",
  "solana-message",
  "solana-program",
@@ -2280,6 +2290,7 @@ dependencies = [
  "spl-token",
  "spl-token-2022-interface 2.1.0",
  "spl-transfer-hook-interface",
+ "svm-witness",
  "testsvm",
  "thiserror 2.0.18",
 ]
@@ -5707,6 +5718,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "svm-witness"
+version = "0.1.0"
+dependencies = [
+ "solana-account",
+ "solana-pubkey 3.0.0",
+ "solana-transaction-context",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5819,8 +5839,14 @@ dependencies = [
 [[package]]
 name = "testsvm"
 version = "0.4.0"
-source = "git+https://github.com/cds-rs/anchor-litesvm?branch=turbin3#c45d76bd5ac998ca0913282cf807a4c3536731a5"
 dependencies = [
+ "base64 0.22.1",
+ "comfy-table",
+ "hex",
+ "indexmap 2.14.0",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "solana-account",
  "solana-clock",
  "solana-instruction",
@@ -5829,6 +5855,7 @@ dependencies = [
  "solana-pubkey 3.0.0",
  "solana-signer",
  "solana-system-interface 3.2.0",
+ "svm-witness",
 ]
 
 [[package]]
@@ -6134,6 +6161,12 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "unicode-width"

@@ -47,9 +47,10 @@ lto = true
 codegen-units = 1
 
 # Repoint litesvm to the cds-rs fork (litesvm 0.12.0 + the
-# `invocation-inspect-callback` hook the observability foundation needs). A
-# strict superset of the crates.io 0.12 these tests already pin, so litesvm-token
-# and the integration tests resolve against it unchanged; the path-dep'd
-# litesvm-utils (which git-deps the same fork) unifies on one litesvm.
+# `invocation-inspect-callback` hook the observability foundation needs). Pinned
+# to the exact rev the local fingerprint anchor-litesvm workspace uses, so the
+# path-dep'd litesvm-utils and the suite's own litesvm/litesvm-token resolve to
+# ONE litesvm (a floating `branch = main` drifts to a newer rev than fingerprint
+# pins, yielding two incompatible `litesvm` types in the graph).
 [patch.crates-io]
-litesvm = { git = "https://github.com/cds-rs/litesvm", branch = "main" }
+litesvm = { git = "https://github.com/cds-rs/litesvm", rev = "03bb2ff3e49321b9d62c7f91b4d0d6c1548b8be6" }

@@ -230,7 +230,7 @@ impl World {
                 .block(format!("{label}: authority graph"), MarkdownBlock::Raw(result.authority_graph_string()));
             self.report.block(
                 format!("{label}: ownership graph"),
-                MarkdownBlock::Raw(result.ownership_graph_string(self.backend.svm())),
+                MarkdownBlock::Raw(result.ownership_graph_string()),
             );
         }
         result

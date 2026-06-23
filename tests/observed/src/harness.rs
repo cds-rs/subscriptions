@@ -44,7 +44,7 @@ pub fn world() -> LiteSvmBackend {
 /// already `` ```mermaid ``-fenced fragments, so they go in verbatim as `Raw`
 /// (fencing them again would bury the diagram inside a text block, the report
 /// bug this crate's predecessor flushed out).
-pub fn render_all(md: &mut Report, result: &TransactionResult, svm: &LiteSVM, caption: &str) {
+pub fn render_all(md: &mut Report, result: &TransactionResult, _svm: &LiteSVM, caption: &str) {
     md.block(
         format!("{caption}: structured CPI tree"),
         MarkdownBlock::Fenced { lang: "text".into(), body: result.logs_structured_string() },
@@ -63,7 +63,7 @@ pub fn render_all(md: &mut Report, result: &TransactionResult, svm: &LiteSVM, ca
     );
     md.block(
         format!("{caption}: ownership graph"),
-        MarkdownBlock::Raw(result.ownership_graph_string(svm)),
+        MarkdownBlock::Raw(result.ownership_graph_string()),
     );
 }
 
