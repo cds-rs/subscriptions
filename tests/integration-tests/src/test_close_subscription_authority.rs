@@ -11,13 +11,13 @@ use solana_signer::Signer;
 use litesvm_utils::TestSVM;
 
 use crate::{
-    tests::utils::{as_pubkey, CloseSubscriptionAuthority, ObservedResultExt, World},
+    tests::utils::{as_pubkey, CloseSubscriptionAuthority, ObservedResultExt, make_backend, World},
     SubscriptionAuthority, SubscriptionsError,
 };
 
 #[test]
 fn close_subscription_authority() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Close a subscription authority",
         "Alice closes her SubscriptionAuthority and the rent returns to her",
     );
@@ -54,7 +54,7 @@ fn close_subscription_authority() {
 
 #[test]
 fn non_owner_cannot_close() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A non-owner cannot close the authority",
         "Mallory cannot close Alice's SubscriptionAuthority",
     );
@@ -90,7 +90,7 @@ fn writable_accounts_must_be_writable() {
 
     let writable = idl::writable_account_indices("closeSubscriptionAuthority");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Close: writable accounts must be writable",
         "flipping any account the close writes to read-only is rejected",
     );
@@ -131,7 +131,7 @@ fn signer_accounts_must_be_signers() {
 
     let signers = idl::signer_account_indices("closeSubscriptionAuthority");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Close: signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -167,7 +167,7 @@ fn signer_accounts_must_be_signers() {
 
 #[test]
 fn close_returns_rent_to_sponsor() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Close returns rent to the sponsor",
         "when a sponsor funded the authority, the close returns rent to them",
     );
@@ -199,7 +199,7 @@ fn close_returns_rent_to_sponsor() {
 
 #[test]
 fn close_without_receiver_when_sponsor_funded_fails() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Close without a receiver fails when a sponsor funded",
         "a sponsor-funded authority cannot be closed without naming the rent receiver",
     );
@@ -225,7 +225,7 @@ fn close_without_receiver_when_sponsor_funded_fails() {
 
 #[test]
 fn close_with_wrong_receiver_unauthorized() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Close with the wrong receiver is unauthorized",
         "the rent receiver must be the stored payer, not an arbitrary account",
     );
@@ -251,7 +251,7 @@ fn close_with_wrong_receiver_unauthorized() {
 
 #[test]
 fn idempotent_init_preserves_original_payer() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Idempotent init preserves the original payer",
         "a second init by a different sponsor leaves the stored payer untouched",
     );
@@ -280,7 +280,7 @@ fn idempotent_init_preserves_original_payer() {
 
 #[test]
 fn closed_account_is_zeroed() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A closed authority account is zeroed",
         "after closing, any residual account data is all zeros",
     );

@@ -13,14 +13,14 @@ use crate::{
     state::common::PlanStatus,
     tests::{
         constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
-        utils::{days, init_mint, CreatePlan, DeletePlan, UpdatePlan, World},
+        utils::{days, init_mint, CreatePlan, DeletePlan, UpdatePlan, make_backend, ModelTxExt, World},
     },
     SubscriptionsError,
 };
 
 #[test]
 fn delete_plan_happy_path() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Delete a sunset, expired plan",
         "the merchant sunsets a plan, lets it expire, then reclaims its rent by deleting it",
     );
@@ -62,7 +62,7 @@ fn delete_plan_happy_path() {
 
 #[test]
 fn delete_plan_not_owner() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject delete by a non-owner",
         "an unauthorized caller (Mallory) cannot delete the merchant's plan",
     );
@@ -96,7 +96,7 @@ fn delete_plan_not_owner() {
 
 #[test]
 fn delete_active_expired_plan() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Delete an active but expired plan",
         "an Active plan past its end_ts can be deleted (sunset is not required)",
     );
@@ -125,7 +125,7 @@ fn delete_active_expired_plan() {
 
 #[test]
 fn delete_active_not_expired_fails() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject delete of an unexpired Active plan",
         "an Active plan whose end_ts is still in the future cannot be deleted",
     );
@@ -148,7 +148,7 @@ fn delete_active_not_expired_fails() {
 
 #[test]
 fn delete_sunset_not_expired_fails() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject delete of a sunset but unexpired plan",
         "sunsetting does not waive the expiry check; an unexpired sunset plan cannot be deleted",
     );
@@ -174,7 +174,7 @@ fn delete_sunset_not_expired_fails() {
 
 #[test]
 fn delete_sunset_exactly_at_end_ts_fails() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject delete exactly at end_ts",
         "the expiry boundary is exclusive: a plan exactly at its end_ts is not yet deletable",
     );
@@ -202,7 +202,7 @@ fn delete_sunset_exactly_at_end_ts_fails() {
 
 #[test]
 fn delete_plan_double_delete_fails() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a double delete",
         "deleting an already-deleted plan fails (the account is gone)",
     );
@@ -235,7 +235,7 @@ fn delete_plan_double_delete_fails() {
 
 #[test]
 fn delete_plan_data_zeroed() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Delete zeroes the plan data",
         "after a delete, any lingering account bytes are zeroed",
     );

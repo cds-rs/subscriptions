@@ -13,7 +13,7 @@ use litesvm_utils::TestSVM;
 use crate::{
     tests::utils::{
             hours, CloseSubscriptionAuthority, CreateDelegation, ObservedResultExt,
-            RevokeAbandonedDelegation, World,
+            RevokeAbandonedDelegation, make_backend, World,
         },
     SubscriptionsError,
 };
@@ -22,7 +22,7 @@ const NO_EXPIRY: i64 = 0;
 
 #[test]
 fn sponsor_recovers_no_expiry_fixed_delegation_after_authority_closed() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Sponsor recovers a no-expiry fixed delegation after the authority is closed",
         "Alice closes her authority; the sponsor sweeps the abandoned fixed delegation and recovers its rent",
     );
@@ -70,7 +70,7 @@ fn sponsor_recovers_no_expiry_fixed_delegation_after_authority_closed() {
 
 #[test]
 fn payer_recovers_no_expiry_recurring_delegation_after_authority_closed() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Payer recovers a no-expiry recurring delegation after the authority is closed",
         "Alice closes her authority; the sponsor sweeps the abandoned recurring delegation and recovers its rent",
     );
@@ -124,7 +124,7 @@ fn payer_recovers_no_expiry_recurring_delegation_after_authority_closed() {
 
 #[test]
 fn payer_recovers_delegation_after_authority_reinit_bumps_init_id() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Payer recovers a delegation after the authority is re-initialized",
         "re-initializing the authority bumps its init_id, so the old delegation is stale and the sponsor can sweep it",
     );
@@ -164,7 +164,7 @@ fn payer_recovers_delegation_after_authority_reinit_bumps_init_id() {
 
 #[test]
 fn revoke_abandoned_rejects_live_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke-abandoned rejects a live delegation",
         "while the authority is open the delegation is live, so the sweep is unauthorized",
     );
@@ -192,7 +192,7 @@ fn revoke_abandoned_rejects_live_delegation() {
 
 #[test]
 fn revoke_abandoned_rejects_non_sponsor_caller() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke-abandoned rejects a non-sponsor caller",
         "only the recorded payer can sweep an abandoned delegation; a stranger is rejected",
     );
@@ -230,7 +230,7 @@ fn revoke_abandoned_rejects_non_sponsor_caller() {
 
 #[test]
 fn revoke_abandoned_rejects_unbound_authority_account() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke-abandoned rejects an unbound authority account",
         "passing an authority account the delegation does not derive from is rejected",
     );

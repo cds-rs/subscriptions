@@ -23,7 +23,7 @@ use crate::{
         pda::get_subscription_authority_pda,
         utils::{as_pubkey, 
             fetch_account, init_aux_token_account, init_mint, set_transfer_hook_config, ObservedResultExt,
-            World,
+            make_backend, ModelTxExt, World,
         },
     },
     AccountDiscriminator, SubscriptionAuthority, SubscriptionsError,
@@ -31,7 +31,7 @@ use crate::{
 
 #[test]
 fn initialize_subscription_authority() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Initialize a subscription authority",
         "Alice initializes her SubscriptionAuthority and delegates her ATA to it",
     );
@@ -61,7 +61,7 @@ fn initialize_subscription_authority() {
     assert!(subscription_authority.init_id >= 0);
 
     // The ATA is now delegated to the authority for the full balance.
-    let ata_account = fetch_account::<spl_token_2022_interface::state::Account>(world.svm(), &user_ata);
+    let ata_account = fetch_account::<spl_token_2022_interface::state::Account, _>(world.svm(), &user_ata);
     assert!(ata_account.delegate.is_some());
     world.md().check("the ATA is delegated to the authority", subscription_authority_pda, ata_account.delegate.unwrap());
     world.md().check("the delegated amount is u64::MAX", u64::MAX, ata_account.delegated_amount);
@@ -69,7 +69,7 @@ fn initialize_subscription_authority() {
 
 #[test]
 fn initialize_subscription_authority_rejects_non_canonical_token_account() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a non-canonical token account",
         "an auxiliary (non-ATA) token account is rejected where the canonical ATA is required",
     );
@@ -103,7 +103,7 @@ fn initialize_subscription_authority_rejects_non_canonical_token_account() {
 
 #[test]
 fn initialize_subscription_authority_with_sponsor() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Initialize with a sponsor",
         "a sponsor pays rent and the fee; Alice's lamports stay untouched",
     );
@@ -133,7 +133,7 @@ fn initialize_subscription_authority_with_sponsor() {
     world.md().check("the sponsor was charged", true, sponsor_balance_after < sponsor_balance_before);
 
     // Verify Approve still went through with user as the ATA authority.
-    let ata_account = fetch_account::<spl_token_2022_interface::state::Account>(world.svm(), &user_ata);
+    let ata_account = fetch_account::<spl_token_2022_interface::state::Account, _>(world.svm(), &user_ata);
     assert_eq!(ata_account.delegate.unwrap(), subscription_authority_pda);
     assert_eq!(ata_account.delegated_amount, u64::MAX);
 }
@@ -153,7 +153,7 @@ fn initialize_subscription_authority_token_2022(
     #[case] extensions: &[ExtensionType],
     #[case] expected_error: Option<SubscriptionsError>,
 ) {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         &format!("Initialize over a Token-2022 mint ({extensions:?})"),
         "the authority initializes over a Token-2022 mint with the given extensions",
     );
@@ -181,7 +181,7 @@ fn initialize_subscription_authority_token_2022(
             assert_eq!(subscription_authority.bump, bump);
             assert!(subscription_authority.init_id >= 0);
 
-            let ata_account = fetch_account::<spl_token_2022_interface::state::Account>(world.svm(), &user_ata);
+            let ata_account = fetch_account::<spl_token_2022_interface::state::Account, _>(world.svm(), &user_ata);
             assert!(ata_account.delegate.is_some());
             assert_eq!(ata_account.delegate.unwrap(), subscription_authority_pda);
             assert_eq!(ata_account.delegated_amount, u64::MAX);
@@ -191,7 +191,7 @@ fn initialize_subscription_authority_token_2022(
 
 #[test]
 fn initialize_subscription_authority_allows_active_transfer_hook() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Allow an active transfer hook",
         "a mint carrying a configured transfer hook is accepted",
     );
@@ -212,13 +212,13 @@ fn initialize_subscription_authority_allows_active_transfer_hook() {
     let (res, _pda, _bump) = world.init_authority(&alice, mint, None);
     res.assert_ok();
 
-    let ata_account = fetch_account::<spl_token_2022_interface::state::Account>(world.svm(), &user_ata);
+    let ata_account = fetch_account::<spl_token_2022_interface::state::Account, _>(world.svm(), &user_ata);
     assert!(ata_account.delegate.is_some());
 }
 
 #[test]
 fn initialize_subscription_authority_allows_mutable_inactive_transfer_hook() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Allow a mutable inactive transfer hook",
         "a mint with a mutable but unset transfer hook is accepted",
     );
@@ -239,13 +239,13 @@ fn initialize_subscription_authority_allows_mutable_inactive_transfer_hook() {
     let (res, _pda, _bump) = world.init_authority(&alice, mint, None);
     res.assert_ok();
 
-    let ata_account = fetch_account::<spl_token_2022_interface::state::Account>(world.svm(), &user_ata);
+    let ata_account = fetch_account::<spl_token_2022_interface::state::Account, _>(world.svm(), &user_ata);
     assert!(ata_account.delegate.is_some());
 }
 
 #[test]
 fn wrong_token_program_returns_error() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a forged token program",
         "passing a non-token account in the token-program slot is rejected",
     );
@@ -279,7 +279,7 @@ fn wrong_token_program_returns_error() {
 /// must not prevent the legitimate user from creating the account.
 #[test]
 fn initialize_subscription_authority_with_prefunded_pda() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Survive a pre-funded PDA",
         "a griefer pre-funds the authority PDA; Alice can still initialize it",
     );
@@ -309,7 +309,7 @@ fn initialize_subscription_authority_with_prefunded_pda() {
     assert_eq!(subscription_authority.bump, bump);
     assert!(subscription_authority.init_id >= 0);
 
-    let ata_account = fetch_account::<spl_token_2022_interface::state::Account>(world.svm(), &user_ata);
+    let ata_account = fetch_account::<spl_token_2022_interface::state::Account, _>(world.svm(), &user_ata);
     assert!(ata_account.delegate.is_some());
     assert_eq!(ata_account.delegate.unwrap(), subscription_authority_pda);
     assert_eq!(ata_account.delegated_amount, u64::MAX);
@@ -317,7 +317,7 @@ fn initialize_subscription_authority_with_prefunded_pda() {
 
 #[test]
 fn initialize_subscription_authority_with_overfunded_pda() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Survive an over-funded PDA",
         "a griefer over-funds the authority PDA; Alice can still initialize it",
     );
@@ -345,7 +345,7 @@ fn initialize_subscription_authority_with_overfunded_pda() {
     assert_eq!(subscription_authority.token_mint.to_bytes(), mint.to_bytes());
     assert_eq!(subscription_authority.bump, bump);
 
-    let ata_account = fetch_account::<spl_token_2022_interface::state::Account>(world.svm(), &user_ata);
+    let ata_account = fetch_account::<spl_token_2022_interface::state::Account, _>(world.svm(), &user_ata);
     assert!(ata_account.delegate.is_some());
     assert_eq!(ata_account.delegate.unwrap(), subscription_authority_pda);
     assert_eq!(ata_account.delegated_amount, u64::MAX);
@@ -355,7 +355,7 @@ fn initialize_subscription_authority_with_overfunded_pda() {
 fn writable_accounts_must_be_writable() {
     let writable = idl::writable_account_indices("initSubscriptionAuthority");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Writable accounts must be writable",
         "flipping any account the instruction writes to read-only is rejected",
     );
@@ -399,7 +399,7 @@ fn writable_accounts_must_be_writable() {
 fn signer_accounts_must_be_signers() {
     let signers = idl::signer_account_indices("initSubscriptionAuthority");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -444,7 +444,7 @@ fn signer_accounts_must_be_signers() {
 /// extra must be rejected because the payer slot requires a signer.
 #[test]
 fn non_signer_payer_rejected() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a non-signer payer",
         "a trailing non-signer account in the optional payer slot is rejected",
     );

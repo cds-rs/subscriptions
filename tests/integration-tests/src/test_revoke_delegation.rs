@@ -9,19 +9,19 @@ use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use litesvm_utils::TestSVM;
+use litesvm_utils::{LiteSvmBackend, TestSVM};
 
 use crate::{
     tests::utils::{
             days, hours, init_mint, CancelSubscription, CreateDelegation, CreateSubscription, ObservedResultExt,
-            RevokeDelegation, RevokeSubscription, World,
+            RevokeDelegation, RevokeSubscription, make_backend, ModelTxExt, World,
         },
     AccountDiscriminator, FixedDelegation, RecurringDelegation, SubscriptionsError,
 };
 
 #[test]
 fn revoke_fixed_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a fixed delegation",
         "the delegator revokes her own fixed delegation and recovers the rent",
     );
@@ -70,7 +70,7 @@ fn revoke_fixed_delegation() {
 
 #[test]
 fn revoke_recurring_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a recurring delegation",
         "the delegator revokes her own recurring delegation and recovers the rent",
     );
@@ -126,7 +126,7 @@ fn non_delegator_cannot_revoke() {
 
     use crate::{instructions::revoke_delegation, tests::constants::PROGRAM_ID};
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A non-delegator cannot revoke",
         "Mallory, who is neither delegator nor payer, cannot revoke a live delegation",
     );
@@ -169,7 +169,7 @@ fn non_delegator_cannot_revoke() {
 
 #[test]
 fn closed_account_is_zeroed() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A closed delegation account is zeroed",
         "after revoke, any residual delegation bytes are all zero",
     );
@@ -206,7 +206,7 @@ fn closed_account_is_zeroed() {
 
 #[test]
 fn revoke_with_wrong_receiver_returns_unauthorized() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke with a wrong receiver is unauthorized",
         "a sponsor-funded delegation cannot route rent to an arbitrary receiver",
     );
@@ -249,7 +249,7 @@ fn writable_accounts_must_be_writable() {
 
     let writable = idl::writable_account_indices("revokeDelegation");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke: writable accounts must be writable",
         "flipping any account the revoke writes to read-only is rejected",
     );
@@ -300,7 +300,7 @@ fn signer_accounts_must_be_signers() {
 
     let signers = idl::signer_account_indices("revokeDelegation");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke: signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -343,7 +343,7 @@ fn signer_accounts_must_be_signers() {
 
 #[test]
 fn revoke_subscription_without_cancel_rejected() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a subscription without cancelling is rejected",
         "a live subscription cannot be revoked before it is cancelled",
     );
@@ -360,7 +360,7 @@ fn revoke_subscription_without_cancel_rejected() {
 
 #[test]
 fn revoke_subscription_after_cancel_succeeds() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a subscription after cancel",
         "once cancelled and past its period, a subscription can be revoked and the rent returns",
     );
@@ -393,7 +393,7 @@ fn revoke_subscription_after_cancel_succeeds() {
 
 #[test]
 fn revoke_subscription_with_future_expires_at_ts_rejected() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a subscription with a future expiry is rejected",
         "a subscription whose expires_at_ts is in the future is not yet revocable",
     );
@@ -419,7 +419,7 @@ fn revoke_subscription_with_future_expires_at_ts_rejected() {
 fn test_revoke_fixed_version_agnostic() {
     use crate::state::header::VERSION_OFFSET;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a fixed delegation across versions",
         "revoke works regardless of the stored header version byte",
     );
@@ -456,7 +456,7 @@ fn test_revoke_fixed_version_agnostic() {
 fn test_revoke_recurring_version_agnostic() {
     use crate::state::header::VERSION_OFFSET;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a recurring delegation across versions",
         "revoke works regardless of the stored header version byte",
     );
@@ -495,7 +495,7 @@ fn test_revoke_recurring_version_agnostic() {
 fn test_revoke_subscription_version_mismatch() {
     use crate::state::header::VERSION_OFFSET;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke a subscription with a version mismatch",
         "a subscription whose version byte was tampered requires migration before revoke",
     );
@@ -518,7 +518,7 @@ fn test_revoke_subscription_version_mismatch() {
 
 #[test]
 fn sponsor_can_revoke_expired_fixed_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor can revoke an expired fixed delegation",
         "once the fixed delegation has expired past the drift window, the sponsor recovers its rent",
     );
@@ -561,7 +561,7 @@ fn sponsor_can_revoke_expired_fixed_delegation() {
 
 #[test]
 fn sponsor_can_revoke_expired_recurring_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor can revoke an expired recurring delegation",
         "once the recurring delegation has expired past the drift window, the sponsor recovers its rent",
     );
@@ -607,7 +607,7 @@ fn sponsor_can_revoke_expired_recurring_delegation() {
 
 #[test]
 fn sponsor_cannot_revoke_non_expired_fixed_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor cannot revoke a non-expired fixed delegation",
         "while the fixed delegation is live, only the delegator may revoke it",
     );
@@ -637,7 +637,7 @@ fn sponsor_cannot_revoke_non_expired_fixed_delegation() {
 
 #[test]
 fn sponsor_cannot_revoke_non_expired_recurring_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor cannot revoke a non-expired recurring delegation",
         "while the recurring delegation is live, only the delegator may revoke it",
     );
@@ -672,7 +672,7 @@ fn sponsor_cannot_revoke_non_expired_recurring_delegation() {
 
 #[test]
 fn sponsor_cannot_revoke_no_expiry_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor cannot revoke a no-expiry delegation",
         "a delegation with no expiry never becomes sponsor-revocable, even far in the future",
     );
@@ -703,7 +703,7 @@ fn sponsor_cannot_revoke_no_expiry_delegation() {
 
 #[test]
 fn sponsor_cannot_revoke_within_drift_window() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor cannot revoke within the drift window",
         "the sponsor is held off until 120s past expiry, then allowed",
     );
@@ -743,7 +743,7 @@ fn sponsor_cannot_revoke_within_drift_window() {
 
 #[test]
 fn delegator_can_revoke_sponsor_funded_before_expiry() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "The delegator can revoke a sponsor-funded delegation before expiry",
         "the delegator revokes early and rent flows to the sponsor (the recorded payer)",
     );
@@ -783,7 +783,7 @@ fn delegator_can_revoke_sponsor_funded_before_expiry() {
 
 #[test]
 fn attacker_cannot_revoke_sponsor_funded_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Mallory cannot revoke a sponsor-funded delegation",
         "Mallory cannot revoke even after expiry, despite naming the sponsor as receiver",
     );
@@ -822,7 +822,7 @@ fn attacker_cannot_revoke_sponsor_funded_delegation() {
 /// need to drive subsequent revoke-subscription tests. Builds the world's state
 /// through the observed sends so each staging action renders into the report.
 fn setup_sponsored_subscription(
-    world: &mut World,
+    world: &mut World<LiteSvmBackend>,
     plan_end_ts: i64,
 ) -> (
     Keypair, // alice (subscriber)
@@ -869,7 +869,7 @@ fn setup_sponsored_subscription(
 
 #[test]
 fn sponsor_revoke_subscription_when_plan_ended() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor can revoke a subscription once the plan ended",
         "once the plan end_ts passes, the sponsor recovers the subscription rent",
     );
@@ -897,7 +897,7 @@ fn sponsor_revoke_subscription_when_plan_ended() {
 fn sponsor_revoke_subscription_when_plan_closed() {
     use crate::{state::common::PlanStatus, tests::utils::{DeletePlan, UpdatePlan}};
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor can revoke a subscription once the plan is closed",
         "after the merchant sunsets and deletes the plan, the sponsor can revoke the subscription",
     );
@@ -933,7 +933,7 @@ fn sponsor_revoke_subscription_when_plan_recreated_with_different_terms() {
     // unilaterally even though `plan_closed` is false on the recreated PDA.
     use crate::{state::common::PlanStatus, tests::utils::{CreatePlan, DeletePlan, UpdatePlan}};
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor can revoke against a recreated ghost plan",
         "a plan recreated under the same id with new terms still lets the sponsor recover rent",
     );
@@ -989,7 +989,7 @@ fn sponsor_revoke_subscription_when_plan_recreated_with_different_terms() {
 
 #[test]
 fn sponsor_revoke_subscription_when_cancelled_and_expired() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor can revoke a cancelled, expired subscription",
         "after the subscriber cancels and the period ends, the sponsor recovers the rent",
     );
@@ -1017,7 +1017,7 @@ fn sponsor_revoke_subscription_when_cancelled_and_expired() {
 
 #[test]
 fn sponsor_revoke_active_subscription_rejected() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor cannot revoke an active subscription",
         "while the plan is active and the subscription is not cancelled, the sponsor cannot revoke",
     );
@@ -1034,7 +1034,7 @@ fn sponsor_revoke_active_subscription_rejected() {
 fn sponsor_revoke_subscription_with_wrong_plan_pda_rejected() {
     use crate::tests::utils::CreatePlan;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A sponsor cannot revoke with the wrong plan PDA",
         "pointing revoke at an unrelated plan is rejected as a subscription/plan mismatch",
     );
@@ -1071,7 +1071,7 @@ fn sponsor_revoke_subscription_with_wrong_plan_pda_rejected() {
 
 #[test]
 fn attacker_cannot_revoke_sponsor_funded_subscription() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Mallory cannot revoke a sponsor-funded subscription",
         "Mallory cannot revoke even after the plan expires; she is neither delegator nor payer",
     );
@@ -1091,7 +1091,7 @@ fn attacker_cannot_revoke_sponsor_funded_subscription() {
 
 #[test]
 fn subscriber_revoke_routes_rent_to_sponsor() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A subscriber revoke routes rent to the sponsor",
         "when the subscriber revokes, the rent flows to the recorded payer (the sponsor)",
     );

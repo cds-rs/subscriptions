@@ -11,12 +11,12 @@
 use solana_signer::Signer;
 
 use crate::tests::utils::{
-    days, token_balance, hours, CreateDelegation, ObservedResultExt, TransferDelegation, World,
+    days, token_balance, hours, CreateDelegation, ObservedResultExt, TransferDelegation, make_backend, ModelTxExt, World,
 };
 
 #[test]
 fn finding_3_1_1_recurring_pull_before_start_ts() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "AUDIT 3.1.1 (regression): the fix refuses a pre-start recurring pull",
         "the PR6 guard refuses a recurring pull before start_ts (Cantina HIGH 3.1.1)",
     );

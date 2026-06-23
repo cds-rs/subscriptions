@@ -18,13 +18,13 @@ use crate::{
     tests::{
         constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
         pda::get_plan_pda,
-        utils::{as_pubkey, days, init_mint, CreatePlan, World},
+        utils::{as_pubkey, days, init_mint, CreatePlan, make_backend, World},
     },
 };
 
 #[test]
 fn create_plan_happy_path() {
-    let mut world = World::new("Create a plan (happy path)", "the merchant creates a 30-day plan and every field is recorded");
+    let mut world = World::new(make_backend(), "Create a plan (happy path)", "the merchant creates a 30-day plan and every field is recorded");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -79,7 +79,7 @@ fn create_plan_happy_path() {
 
 #[test]
 fn create_plan_no_expiry() {
-    let mut world = World::new("Create a plan with no expiry", "a plan with end_ts 0 never expires");
+    let mut world = World::new(make_backend(), "Create a plan with no expiry", "a plan with end_ts 0 never expires");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -106,7 +106,7 @@ fn create_plan_no_expiry() {
 
 #[test]
 fn create_plan_period_hours_zero() {
-    let mut world = World::new("Reject a zero-hour period", "a plan with period_hours 0 is rejected");
+    let mut world = World::new(make_backend(), "Reject a zero-hour period", "a plan with period_hours 0 is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -125,7 +125,7 @@ fn create_plan_period_hours_zero() {
 
 #[test]
 fn create_plan_period_hours_exceeds_max() {
-    let mut world = World::new("Reject an over-long period", "a plan whose period exceeds the max is rejected");
+    let mut world = World::new(make_backend(), "Reject an over-long period", "a plan whose period exceeds the max is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -144,7 +144,7 @@ fn create_plan_period_hours_exceeds_max() {
 
 #[test]
 fn create_plan_amount_zero() {
-    let mut world = World::new("Reject a zero amount", "a plan with a zero amount is rejected");
+    let mut world = World::new(make_backend(), "Reject a zero amount", "a plan with a zero amount is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -163,7 +163,7 @@ fn create_plan_amount_zero() {
 
 #[test]
 fn create_plan_no_destinations() {
-    let mut world = World::new("Create a plan with no destinations", "a plan without destinations leaves the slots zeroed");
+    let mut world = World::new(make_backend(), "Create a plan with no destinations", "a plan without destinations leaves the slots zeroed");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -185,7 +185,7 @@ fn create_plan_no_destinations() {
 
 #[test]
 fn create_plan_expired_end_ts() {
-    let mut world = World::new("Reject an already-expired end_ts", "a plan whose end_ts is in the past is rejected");
+    let mut world = World::new(make_backend(), "Reject an already-expired end_ts", "a plan whose end_ts is in the past is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -205,7 +205,7 @@ fn create_plan_expired_end_ts() {
 
 #[test]
 fn create_plan_end_ts_before_first_period() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject an end_ts before the first period",
         "a plan whose end_ts lands before its first period closes is rejected",
     );
@@ -229,7 +229,7 @@ fn create_plan_end_ts_before_first_period() {
 
 #[test]
 fn create_plan_wrong_pda() {
-    let mut world = World::new("Reject a forged plan PDA", "passing a non-canonical plan PDA is rejected");
+    let mut world = World::new(make_backend(), "Reject a forged plan PDA", "passing a non-canonical plan PDA is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -260,7 +260,7 @@ fn create_plan_mint_mismatch_attack() {
         },
     };
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a mint-mismatch attack",
         "a forged instruction whose embedded mint differs from the passed mint account is rejected",
     );
@@ -310,7 +310,7 @@ fn create_plan_mint_mismatch_attack() {
 
 #[test]
 fn create_plan_prefunded_pda() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Survive a pre-funded plan PDA",
         "a griefer pre-funds the plan PDA; the merchant can still create the plan",
     );
@@ -348,7 +348,7 @@ fn create_plan_prefunded_pda() {
 
 #[test]
 fn create_plan_duplicate_plan_id() {
-    let mut world = World::new("Reject a duplicate plan id", "re-creating a plan with an existing id is rejected");
+    let mut world = World::new(make_backend(), "Reject a duplicate plan id", "re-creating a plan with an existing id is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);

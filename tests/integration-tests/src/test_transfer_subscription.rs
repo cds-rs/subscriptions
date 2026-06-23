@@ -15,7 +15,7 @@ use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
-use litesvm_utils::TestSVM;
+use litesvm_utils::{LiteSvmBackend, TestSVM};
 
 use crate::{
     event_engine::event_authority_pda,
@@ -25,7 +25,7 @@ use crate::{
         pda::{get_plan_pda, get_subscription_authority_pda},
         utils::{
             days, token_balance, hours, init_ata, CancelSubscription, CreatePlan, CreateSubscription,
-            DeletePlan, ObservedResultExt, TransferSubscription, UpdatePlan, World,
+            DeletePlan, ObservedResultExt, TransferSubscription, UpdatePlan, make_backend, World,
         },
     },
     SubscriptionsError,
@@ -38,7 +38,7 @@ use crate::{
 /// injected directly with the world's clock as the period start.
 #[allow(clippy::type_complexity)]
 fn setup_plan_and_subscription(
-    world: &mut World,
+    world: &mut World<LiteSvmBackend>,
     amount_per_period: u64,
     period_hours: u64,
     end_ts: i64,
@@ -93,7 +93,7 @@ fn setup_plan_and_subscription(
 
 #[test]
 fn test_transfer_subscription_success() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a merchant pulls",
         "the merchant pulls funds against Alice's standing subscription",
     );
@@ -126,7 +126,7 @@ fn test_transfer_subscription_success() {
 
 #[test]
 fn test_transfer_subscription_puller_authorized() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: an authorized puller pulls",
         "a whitelisted puller (not the merchant) pulls against the subscription",
     );
@@ -160,7 +160,7 @@ fn test_transfer_subscription_puller_authorized() {
 
 #[test]
 fn test_transfer_subscription_unauthorized_caller() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: an unauthorized caller is refused",
         "Mallory (neither merchant nor whitelisted puller) cannot pull",
     );
@@ -185,7 +185,7 @@ fn test_transfer_subscription_unauthorized_caller() {
 
 #[test]
 fn test_transfer_subscription_multiple_pulls_within_period() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: multiple pulls within a period",
         "two pulls within the same period accumulate up to the period limit",
     );
@@ -225,7 +225,7 @@ fn test_transfer_subscription_multiple_pulls_within_period() {
 
 #[test]
 fn test_transfer_subscription_exceeds_period_limit() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: exceeding the period limit is refused",
         "a single pull over the per-period amount is rejected",
     );
@@ -253,7 +253,7 @@ fn test_transfer_subscription_exceeds_period_limit() {
 
 #[test]
 fn test_transfer_subscription_period_rollover() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: the period rolls over",
         "advancing past the period boundary resets the pulled amount",
     );
@@ -297,7 +297,7 @@ fn test_transfer_subscription_period_rollover() {
 
 #[test]
 fn test_transfer_subscription_plan_expired() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: an expired plan is refused",
         "a pull past the plan's end_ts is rejected",
     );
@@ -321,7 +321,7 @@ fn test_transfer_subscription_plan_expired() {
 
 #[test]
 fn test_transfer_subscription_subscription_cancelled() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a cancelled subscription past its period is refused",
         "a pull after the subscription's expires_at_ts (a past period end) is rejected",
     );
@@ -359,7 +359,7 @@ fn test_transfer_subscription_subscription_cancelled() {
 
 #[test]
 fn test_transfer_subscription_cancelled_allows_current_period() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: cancellation still allows the current period",
         "a pull within the same period as a cancellation still succeeds",
     );
@@ -389,7 +389,7 @@ fn test_transfer_subscription_cancelled_allows_current_period() {
 
 #[test]
 fn test_transfer_subscription_cancelled_blocks_next_period() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: cancellation blocks the next period",
         "a pull after the period boundary following a cancellation is rejected",
     );
@@ -424,7 +424,7 @@ fn test_transfer_subscription_cancelled_blocks_next_period() {
 
 #[test]
 fn test_transfer_subscription_destination_valid() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a whitelisted destination is allowed",
         "a pull to a whitelisted destination ATA succeeds",
     );
@@ -454,7 +454,7 @@ fn test_transfer_subscription_destination_valid() {
 
 #[test]
 fn test_transfer_subscription_destination_invalid() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a non-whitelisted destination is refused",
         "a pull to an ATA outside the plan's destination whitelist is rejected",
     );
@@ -487,7 +487,7 @@ fn test_transfer_subscription_destination_invalid() {
 
 #[test]
 fn test_transfer_subscription_no_destinations_any_receiver() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: no whitelist allows any receiver",
         "with no destination whitelist, a pull to any receiver succeeds",
     );
@@ -516,7 +516,7 @@ fn test_transfer_subscription_no_destinations_any_receiver() {
 
 #[test]
 fn test_transfer_subscription_wrong_subscription_for_plan() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a mismatched subscription is refused",
         "pulling plan 1 with a subscription minted against plan 2 is rejected",
     );
@@ -573,7 +573,7 @@ fn test_transfer_subscription_wrong_subscription_for_plan() {
 
 #[test]
 fn test_transfer_subscription_zero_amount() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a zero amount is refused",
         "a pull of zero tokens is rejected as an invalid amount",
     );
@@ -596,7 +596,7 @@ fn test_transfer_subscription_zero_amount() {
 fn test_transfer_subscription_sunset_allows_transfer() {
     // A sunset plan (status=0) should still allow existing subscription pulls.
     // The plan status doesn't block transfers; only end_ts and subscription expires_at_ts do.
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a sunset plan still allows pulls",
         "a plan flipped to sunset status still permits an existing subscription's pull",
     );
@@ -629,7 +629,7 @@ fn test_transfer_subscription_sunset_allows_transfer() {
 fn test_transfer_subscription_plan_closed() {
     // When a Plan account is closed (zeroed + ownership transferred to system program),
     // the transfer must fail with PlanClosed rather than a generic error.
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a closed plan is refused",
         "pulling against a plan whose account has been closed is rejected with PlanClosed",
     );
@@ -660,7 +660,7 @@ fn writable_accounts_must_be_writable() {
 
     let writable = idl::writable_account_indices("transferSubscription");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: writable accounts must be writable",
         "flipping any account the instruction writes to read-only is rejected",
     );
@@ -722,7 +722,7 @@ fn signer_accounts_must_be_signers() {
 
     let signers = idl::signer_account_indices("transferSubscription");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -783,7 +783,7 @@ fn signer_accounts_must_be_signers() {
 fn test_subscription_transfer_version_mismatch() {
     use crate::state::header::VERSION_OFFSET;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a version-mismatched subscription is refused",
         "a subscription account with a downgraded version requires migration before a pull",
     );
@@ -817,7 +817,7 @@ fn test_subscription_transfer_version_mismatch() {
 fn test_subscription_transfer_stale_subscription_authority() {
     use crate::tests::utils::CloseSubscriptionAuthority;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a stale subscription authority is refused",
         "re-initializing the authority bumps its init_id, staling the subscription's pull",
     );
@@ -855,7 +855,7 @@ fn test_subscription_transfer_stale_subscription_authority() {
 fn test_transfer_subscription_ghost_plan_rejected() {
     use crate::state::common::PlanStatus;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Transfer subscription: a ghost (re-created) plan is refused",
         "a plan deleted and re-created at the same PDA with new terms staling the subscription's pull",
     );

@@ -15,13 +15,14 @@ use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
+use litesvm_utils::LiteSvmBackend;
 use crate::{
     state::common::PlanStatus,
     tests::{
         pda::{get_plan_pda, get_subscription_pda},
         utils::{
             days, token_balance, hours, CreatePlan, DeletePlan, ObservedResultExt, Subscribe,
-            TransferSubscription, UpdatePlan, World,
+            TransferSubscription, UpdatePlan, make_backend, ModelTxExt, World,
         },
     },
 };
@@ -39,7 +40,7 @@ struct Ghost {
 /// Alice subscribes to the merchant's plan (consenting to `original_amount`/hour),
 /// then the merchant sunsets, expires, deletes, and recreates the plan at the
 /// same id with `ghost_amount`/hour and an `end_ts` `ghost_end_days` out.
-fn stage_and_recreate(world: &mut World, original_amount: u64, ghost_amount: u64, ghost_end_days: u64) -> Ghost {
+fn stage_and_recreate(world: &mut World<LiteSvmBackend>, original_amount: u64, ghost_amount: u64, ghost_end_days: u64) -> Ghost {
     let alice = world.actor("alice");
     let merchant = world.actor("merchant");
     let mint = world.usdc_mint(&alice);
@@ -90,7 +91,7 @@ fn stage_and_recreate(world: &mut World, original_amount: u64, ghost_amount: u64
 
 #[test]
 fn finding_3_1_2_ghost_plan_inflated_amount_drains() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "AUDIT 3.1.2 (regression): the fix refuses the inflated ghost plan",
         "the merchant recreates the plan at 100M/hour and pulls far more than Alice consented to (Cantina HIGH 3.1.2)",
     );
@@ -121,7 +122,7 @@ fn finding_3_1_2_ghost_plan_inflated_amount_drains() {
 
 #[test]
 fn finding_3_1_4_ghost_plan_extended_end_ts_siphons() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "AUDIT 3.1.4 (regression): the fix refuses the extended-end_ts ghost plan",
         "the merchant recreates the plan with a 60-day end_ts and keeps pulling past the original end (Cantina HIGH 3.1.4)",
     );

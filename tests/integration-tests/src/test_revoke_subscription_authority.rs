@@ -14,7 +14,7 @@ use crate::{
         constants::{MINT_DECIMALS, TOKEN_2022_PROGRAM_ID},
         utils::{
             fetch_account, init_mint, CloseSubscriptionAuthority, ObservedResultExt,
-            RevokeSubscriptionAuthority, World,
+            RevokeSubscriptionAuthority, make_backend, World,
         },
     },
     SubscriptionsError,
@@ -22,7 +22,7 @@ use crate::{
 
 #[test]
 fn revoke_subscription_authority_clears_delegate() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke clears the delegate",
         "Alice revokes her subscription authority; her ATA's delegate is cleared",
     );
@@ -35,7 +35,7 @@ fn revoke_subscription_authority_clears_delegate() {
     world.md().step("Alice initializes her subscription authority");
     world.init_authority(&user, mint, None).0.assert_ok();
 
-    let before = fetch_account::<TokenAccount>(world.svm(), &user_ata);
+    let before = fetch_account::<TokenAccount, _>(world.svm(), &user_ata);
     assert!(before.delegate.is_some());
     world.md().check("the ATA is delegated for the full amount before revoke", u64::MAX, before.delegated_amount);
 
@@ -43,14 +43,14 @@ fn revoke_subscription_authority_clears_delegate() {
     let ix = RevokeSubscriptionAuthority::new(world.svm_mut(), &user, mint).instruction();
     world.send_ok(&[ix], &[&user], "RevokeSubscriptionAuthority");
 
-    let after = fetch_account::<TokenAccount>(world.svm(), &user_ata);
+    let after = fetch_account::<TokenAccount, _>(world.svm(), &user_ata);
     world.md().check("the delegate is cleared after revoke", true, after.delegate.is_none());
     world.md().check("the delegated amount is zeroed after revoke", 0, after.delegated_amount);
 }
 
 #[test]
 fn revoke_subscription_authority_clears_delegate_token_2022() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke clears the delegate (Token-2022)",
         "Alice revokes her authority over a Token-2022 mint; her ATA's delegate is cleared",
     );
@@ -63,7 +63,7 @@ fn revoke_subscription_authority_clears_delegate_token_2022() {
     world.md().step("Alice initializes her subscription authority");
     world.init_authority(&user, mint, None).0.assert_ok();
 
-    let before = fetch_account::<TokenAccount>(world.svm(), &user_ata);
+    let before = fetch_account::<TokenAccount, _>(world.svm(), &user_ata);
     assert!(before.delegate.is_some());
     world.md().check("the ATA is delegated for the full amount before revoke", u64::MAX, before.delegated_amount);
 
@@ -71,14 +71,14 @@ fn revoke_subscription_authority_clears_delegate_token_2022() {
     let ix = RevokeSubscriptionAuthority::new(world.svm_mut(), &user, mint).instruction();
     world.send_ok(&[ix], &[&user], "RevokeSubscriptionAuthority");
 
-    let after = fetch_account::<TokenAccount>(world.svm(), &user_ata);
+    let after = fetch_account::<TokenAccount, _>(world.svm(), &user_ata);
     world.md().check("the delegate is cleared after revoke", true, after.delegate.is_none());
     world.md().check("the delegated amount is zeroed after revoke", 0, after.delegated_amount);
 }
 
 #[test]
 fn revoke_subscription_authority_works_after_close() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Revoke works after close",
         "Alice closes her authority leaving a dangling delegate; revoke still clears it",
     );
@@ -97,7 +97,7 @@ fn revoke_subscription_authority_works_after_close() {
     }
 
     // Closing the authority leaves the ATA delegation dangling.
-    let dangling = fetch_account::<TokenAccount>(world.svm(), &user_ata);
+    let dangling = fetch_account::<TokenAccount, _>(world.svm(), &user_ata);
     assert!(dangling.delegate.is_some());
     world.md().check("the delegate dangles after close", u64::MAX, dangling.delegated_amount);
 
@@ -105,7 +105,7 @@ fn revoke_subscription_authority_works_after_close() {
     let ix = RevokeSubscriptionAuthority::new(world.svm_mut(), &user, mint).instruction();
     world.send_ok(&[ix], &[&user], "RevokeSubscriptionAuthority");
 
-    let after = fetch_account::<TokenAccount>(world.svm(), &user_ata);
+    let after = fetch_account::<TokenAccount, _>(world.svm(), &user_ata);
     world.md().check(
         "revoke clears the dangling delegate even after the authority is closed",
         true,
@@ -116,7 +116,7 @@ fn revoke_subscription_authority_works_after_close() {
 
 #[test]
 fn revoke_subscription_authority_rejects_ata_mint_mismatch() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject an ATA / mint mismatch",
         "revoke is refused when the passed ATA belongs to a different mint than the instruction's mint",
     );

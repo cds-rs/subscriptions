@@ -16,7 +16,7 @@ use crate::{
         pda::get_delegation_pda,
         utils::{as_pubkey, 
             days, token_balance, CloseSubscriptionAuthority, CreateDelegation,
-            ObservedResultExt, RevokeDelegation, TransferDelegation, World,
+            ObservedResultExt, RevokeDelegation, TransferDelegation, make_backend, ModelTxExt, World,
         },
     },
     AccountDiscriminator, FixedDelegation, SubscriptionsError,
@@ -24,7 +24,7 @@ use crate::{
 
 #[test]
 fn create_fixed_delegation_with_sponsor() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Create a fixed delegation with a sponsor",
         "a sponsor pays the delegation rent; revoking refunds it to the sponsor",
     );
@@ -91,7 +91,7 @@ fn create_fixed_delegation_with_sponsor() {
 
 #[test]
 fn create_fixed_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Create a fixed delegation",
         "Alice grants a fixed-amount delegation to a delegatee",
     );
@@ -135,7 +135,7 @@ fn create_fixed_delegation() {
 
 #[test]
 fn create_fixed_delegation_rejects_stale_subscription_authority_generation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a stale subscription-authority generation",
         "a delegation pinned to a closed authority's init_id is rejected after re-init",
     );
@@ -185,7 +185,7 @@ fn create_fixed_delegation_rejects_stale_subscription_authority_generation() {
 fn create_fixed_delegation_with_prefunded_pda() {
     use solana_account::Account;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Survive a pre-funded delegation PDA",
         "a griefer pre-funds the delegation PDA; Alice can still create it",
     );
@@ -252,7 +252,7 @@ fn create_fixed_delegation_with_prefunded_pda() {
 
 #[test]
 fn create_delegation_without_subscription_authority() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a delegation without a subscription authority",
         "creating a delegation before initializing the authority is refused",
     );
@@ -273,7 +273,7 @@ fn create_delegation_without_subscription_authority() {
 
 #[test]
 fn create_delegation_wrong_pda() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a delegation at the wrong PDA",
         "an instruction pointed at a non-canonical delegation PDA is refused",
     );
@@ -298,7 +298,7 @@ fn create_delegation_wrong_pda() {
 
 #[test]
 fn create_delegation_duplicate_nonce() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a duplicate delegation nonce",
         "creating a second delegation at the same nonce is refused",
     );
@@ -327,7 +327,7 @@ fn create_delegation_duplicate_nonce() {
 
 #[test]
 fn create_multiple_delegations_different_nonces() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Create multiple delegations at different nonces",
         "distinct nonces derive distinct delegation PDAs",
     );
@@ -383,7 +383,7 @@ fn writable_accounts_must_be_writable() {
 
     let writable = idl::writable_account_indices("createFixedDelegation");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Create fixed delegation: writable accounts must be writable",
         "flipping any account the instruction writes to read-only is rejected",
     );
@@ -452,7 +452,7 @@ fn signer_accounts_must_be_signers() {
 
     let signers = idl::signer_account_indices("createFixedDelegation");
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Create fixed delegation: signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -513,7 +513,7 @@ fn signer_accounts_must_be_signers() {
 
 #[test]
 fn create_fixed_delegation_with_expiry_in_past() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a fixed delegation with a past expiry",
         "an expiry timestamp before now is refused",
     );
@@ -540,7 +540,7 @@ fn create_fixed_delegation_with_expiry_in_past() {
 
 #[test]
 fn create_fixed_delegation_with_zero_expiry() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Create a fixed delegation with a zero expiry",
         "a zero expiry means no expiry; the delegatee can still pull later",
     );

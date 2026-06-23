@@ -14,14 +14,14 @@ use litesvm_utils::TestSVM;
 use crate::{
     tests::utils::{as_pubkey, 
             days, token_balance, CloseSubscriptionAuthority, CreateDelegation,
-            ObservedResultExt, TransferDelegation, World,
+            ObservedResultExt, TransferDelegation, make_backend, World,
         },
     AccountDiscriminator, RecurringDelegation, SubscriptionsError,
 };
 
 #[test]
 fn create_recurring_delegation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Create a recurring delegation",
         "Alice grants a recurring pull delegation and its header and terms are recorded",
     );
@@ -76,7 +76,7 @@ fn create_recurring_delegation() {
 
 #[test]
 fn create_recurring_delegation_rejects_stale_subscription_authority_generation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a stale subscription-authority generation",
         "a recurring delegation pinned to a closed-then-reinitialized authority's old init_id is rejected",
     );
@@ -131,7 +131,7 @@ fn create_recurring_delegation_rejects_stale_subscription_authority_generation()
 
 #[test]
 fn create_recurring_delegation_with_past_start_ts() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a recurring delegation with a past start",
         "a start_ts in the past (i64::MIN sentinel of past) is rejected",
     );
@@ -166,7 +166,7 @@ fn create_recurring_delegation_with_past_start_ts() {
 
 #[test]
 fn create_recurring_delegation_with_zero_period() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a recurring delegation with a zero period",
         "a period_length_s of zero is rejected",
     );
@@ -201,7 +201,7 @@ fn create_recurring_delegation_with_zero_period() {
 
 #[test]
 fn create_recurring_delegation_with_start_ts_greater_than_expiry_ts() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a recurring delegation whose start exceeds its expiry",
         "a start_ts greater than expiry_ts is rejected",
     );
@@ -236,7 +236,7 @@ fn create_recurring_delegation_with_start_ts_greater_than_expiry_ts() {
 
 #[test]
 fn create_recurring_delegation_with_period_exceeding_max() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Reject a recurring delegation whose period exceeds the maximum",
         "a period_length_s beyond the one-year cap is rejected",
     );
@@ -271,7 +271,7 @@ fn create_recurring_delegation_with_period_exceeding_max() {
 
 #[test]
 fn create_recurring_delegation_with_sentinel_start_starts_at_landing() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Sentinel start begins at landing",
         "a start_ts of 0 anchors the first period to the on-chain landing time, and the delegatee can pull",
     );
@@ -320,7 +320,7 @@ fn create_recurring_delegation_with_sentinel_start_starts_at_landing() {
 
 #[test]
 fn create_recurring_delegation_sentinel_start_requires_expiry() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Sentinel start requires an expiry",
         "a start_ts of 0 with a zero expiry is rejected",
     );
@@ -355,7 +355,7 @@ fn create_recurring_delegation_sentinel_start_requires_expiry() {
 
 #[test]
 fn create_recurring_delegation_sentinel_start_rejects_elapsed_expiry() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Sentinel start rejects an already-elapsed expiry",
         "a start_ts of 0 with an expiry the landing clock has already passed is rejected",
     );
@@ -393,7 +393,7 @@ fn create_recurring_delegation_sentinel_start_rejects_elapsed_expiry() {
 
 #[test]
 fn create_recurring_delegation_with_zero_expiry() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "A zero expiry means no expiry",
         "a zero expiry_ts records an open-ended delegation that still pulls after a long warp",
     );

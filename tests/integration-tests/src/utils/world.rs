@@ -35,10 +35,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use litesvm_utils::{
-    deterministic_keypair, Keypair, LiteSVM, LiteSvmBackend, MarkdownBlock, Pubkey, Report, Signer, TestSVM,
-    TransactionResult,
+    deterministic_keypair, model, Keypair, LiteSVM, LiteSvmBackend, MarkdownBlock, Pubkey, Report, Signer, TestSVM,
 };
 use solana_instruction::{AccountMeta, Instruction};
+
+use crate::tests::utils::ModelTxExt;
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
 use crate::{
@@ -73,24 +74,34 @@ macro_rules! errors {
     };
 }
 
+/// Build the concrete litesvm backend the suite runs on: a fresh `LiteSVM` with
+/// the subscriptions program loaded from its built `.so`. This is the one place
+/// the engine is named; [`World::new`] takes whatever backend it is handed, so
+/// binding a different `TestSVM` engine later is a swap here, not in the World.
+pub fn make_backend() -> LiteSvmBackend {
+    let mut backend = LiteSvmBackend::new(LiteSVM::new());
+    let so = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/subscriptions_program.so");
+    let bytes = std::fs::read(so).unwrap();
+    backend.deploy_program(PROGRAM_ID, &bytes);
+    backend
+}
+
 /// One object holding the backend, the narrative report, and the set of
-/// already-funded actors.
-pub struct World {
-    backend: LiteSvmBackend,
+/// already-funded actors. Generic over the [`TestSVM`] engine: stage 1 routed
+/// every account/clock/program access through trait methods, so this is the same
+/// harness with the concrete `LiteSvmBackend` lifted to a type parameter.
+pub struct World<B: TestSVM> {
+    backend: B,
     report: Report,
     funded: HashSet<String>,
 }
 
-impl World {
-    /// Build the world: the program loaded, the clock pinned to [`NOW`], and the
-    /// whole instruction / error / event vocabulary registered on the backend so
-    /// every rendered artifact reads in names rather than bytes.
-    pub fn new(title: &str, intent: &str) -> Self {
-        let mut svm = LiteSVM::new();
-        let so = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/subscriptions_program.so");
-        svm.add_program_from_file(PROGRAM_ID.to_bytes(), so).unwrap();
-
-        let mut backend = LiteSvmBackend::new(svm);
+impl<B: TestSVM> World<B> {
+    /// Build the world from an already-constructed `backend` (see
+    /// [`make_backend`]): the clock pinned to [`NOW`], and the whole instruction
+    /// / error / event vocabulary registered on the backend so every rendered
+    /// artifact reads in names rather than bytes.
+    pub fn new(mut backend: B, title: &str, intent: &str) -> Self {
         backend.warp_to_timestamp(NOW);
         backend.register_alias(&PROGRAM_ID, "subscriptions");
         backend.register_alias(&Pubkey::new_from_array(event_authority_pda::ID.to_bytes()), "EventAuthority");
@@ -172,12 +183,12 @@ impl World {
     /// The backend, for the suite's fabrication helpers (`init_mint`,
     /// `init_ata`, ...). Sends made directly through this are setup, not the
     /// observed action under test.
-    pub fn svm_mut(&mut self) -> &mut LiteSvmBackend {
+    pub fn svm_mut(&mut self) -> &mut B {
         &mut self.backend
     }
 
     /// Read-only view of the backend.
-    pub fn svm(&self) -> &LiteSvmBackend {
+    pub fn svm(&self) -> &B {
         &self.backend
     }
 
@@ -211,8 +222,8 @@ impl World {
     /// already carries the named error.
     ///
     /// `signers[0]` is the fee payer; order a sponsor first when it should pay.
-    pub fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair], label: &str) -> TransactionResult {
-        let result: TransactionResult = self.backend.send(ixs, signers).into();
+    pub fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair], label: &str) -> model::Transaction {
+        let result = self.backend.send(ixs, signers);
 
         self.report.block(
             format!("{label}: structured CPI tree"),
@@ -235,7 +246,7 @@ impl World {
     }
 
     /// Observed send that must succeed; asserts and returns the rich result.
-    pub fn send_ok(&mut self, ixs: &[Instruction], signers: &[&Keypair], label: &str) -> TransactionResult {
+    pub fn send_ok(&mut self, ixs: &[Instruction], signers: &[&Keypair], label: &str) -> model::Transaction {
         self.send(ixs, signers, label).assert_ok()
     }
 
@@ -255,7 +266,7 @@ impl World {
         user: &Keypair,
         mint: Pubkey,
         sponsor: Option<&Keypair>,
-    ) -> (TransactionResult, Pubkey, u8) {
+    ) -> (model::Transaction, Pubkey, u8) {
         let token_program = self.backend.get_account(&mint).unwrap().owner;
         let user_ata = get_associated_token_address_with_program_id(&user.pubkey(), &mint, &token_program);
         let (pda, bump) = get_subscription_authority_pda(&user.pubkey(), &mint);
@@ -351,7 +362,7 @@ pub struct StagedSubscription {
 /// plus the 1-byte event discriminator (the program emits events as a self-CPI
 /// whose data is `EVENT_IX_TAG_LE ++ disc ++ borsh fields`, so there is no
 /// `Program data:` log; the decoder reads the payload off the traced frame).
-fn register_events(backend: &mut LiteSvmBackend) {
+fn register_events<B: TestSVM>(backend: &mut B) {
     // SubscriptionCreated (disc 0): plan(32) ++ subscriber(32) ++ mint(32) ++ created_ts(i64).
     backend.register_cpi_event(
         &PROGRAM_ID,
@@ -402,9 +413,16 @@ fn pk(raw: &[u8]) -> String {
     Pubkey::new_from_array(<[u8; 32]>::try_from(raw).unwrap()).to_string()
 }
 
-/// Ergonomic assertions on the observed (rich) result, mirroring the suite's
-/// `TransactionResultExt` so converted tests read the same: `.assert_ok()` /
-/// `.assert_err(SubscriptionsError::X)`.
+/// Ergonomic assertions on the observed (engine-neutral) result, mirroring the
+/// suite's `TransactionResultExt` so converted tests read the same: `.assert_ok()`
+/// / `.assert_err(SubscriptionsError::X)`. These bridge the domain error enum
+/// onto the neutral [`ModelTxExt`] primitives (`assert_success` /
+/// `assert_error_code`), so the World path asserts against `model::Transaction`
+/// without ever holding a litesvm `TransactionResult`.
+///
+/// Hoist-to-testsvm note: `ModelTxExt` is the engine-neutral half and belongs
+/// upstream; this trait stays suite-local because it is wired to the
+/// subscriptions error enum.
 pub trait ObservedResultExt {
     /// Assert the transaction succeeded; returns the result for chaining.
     fn assert_ok(self) -> Self;
@@ -412,7 +430,7 @@ pub trait ObservedResultExt {
     fn assert_err(self, expected: SubscriptionsError);
 }
 
-impl ObservedResultExt for TransactionResult {
+impl ObservedResultExt for model::Transaction {
     fn assert_ok(self) -> Self {
         self.assert_success()
     }

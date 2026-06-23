@@ -13,11 +13,11 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use crate::tests::{pda::get_subscription_authority_pda, utils::World};
+use crate::tests::{pda::get_subscription_authority_pda, utils::{make_backend, ModelTxExt, World}};
 
 #[test]
 fn finding_3_1_3_prefunded_pda_blocks_creation() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "AUDIT 3.1.3 (regression): the fix survives a pre-funded PDA",
         "the PR5 fix tops up a pre-funded PDA so Alice can still initialize (Cantina HIGH 3.1.3)",
     );

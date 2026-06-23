@@ -15,14 +15,14 @@ use crate::{
     tests::utils::{
             days, token_balance, hours, minutes, CancelSubscription, CreatePlan,
             CreateSubscription, DeletePlan, ObservedResultExt, RevokeSubscription, TransferSubscription, UpdatePlan,
-            World,
+            make_backend, World,
         },
     SubscriptionsError,
 };
 
 #[test]
 fn cancel_subscription_happy_path() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel a subscription (happy path)",
         "Alice cancels her live subscription; it gets an end-of-period expiry",
     );
@@ -40,7 +40,7 @@ fn cancel_subscription_happy_path() {
 
 #[test]
 fn cancel_at_exact_end_ts_keeps_final_period_billable() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel at exact plan end keeps the final period billable",
         "cancelling exactly at end_ts still allows the merchant to pull the final period",
     );
@@ -116,7 +116,7 @@ fn cancel_at_exact_end_ts_keeps_final_period_billable() {
 
 #[test]
 fn cancel_subscription_non_subscriber_rejected() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel rejects a non-subscriber",
         "Mallory cannot cancel a subscription she does not own",
     );
@@ -135,7 +135,7 @@ fn cancel_subscription_non_subscriber_rejected() {
 
 #[test]
 fn cancel_subscription_already_cancelled_rejected() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel rejects an already-cancelled subscription",
         "cancelling twice is rejected",
     );
@@ -162,7 +162,7 @@ fn cancel_subscription_already_cancelled_rejected() {
 fn test_cancel_subscription_version_mismatch() {
     use crate::state::header::VERSION_OFFSET;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel rejects a stale account version",
         "a downgraded version byte forces a MigrationRequired error",
     );
@@ -187,7 +187,7 @@ fn test_cancel_subscription_version_mismatch() {
 fn cancel_subscription_ghost_plan_expires_immediately() {
     use crate::state::common::PlanStatus;
 
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel on a ghost plan expires immediately",
         "a recreated plan (same id, new terms) gives a cancelled subscription no grace period",
     );
@@ -243,7 +243,7 @@ fn cancel_subscription_ghost_plan_expires_immediately() {
 
 #[test]
 fn cancel_subscription_caps_at_plan_end_ts() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel caps expiry at the plan end_ts",
         "expiry is capped just past the inclusive plan end_ts, not the period end",
     );
@@ -289,7 +289,7 @@ fn cancel_subscription_caps_at_plan_end_ts() {
 
 #[test]
 fn cancel_subscription_after_plan_expired_allows_immediate_revoke() {
-    let mut world = World::new(
+    let mut world = World::new(make_backend(), 
         "Cancel after plan expiry allows an immediate revoke",
         "cancelling a subscription whose plan already expired sets expiry at-or-before now",
     );
