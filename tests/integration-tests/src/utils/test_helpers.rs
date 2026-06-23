@@ -3,17 +3,13 @@ use std::vec::Vec;
 
 pub use scenarios::helpers::{days, minutes, rent_exempt_lamports};
 
-use litesvm::types::TransactionResult;
-use litesvm_utils::{LiteSVM, LiteSvmBackend, TestSVM};
+use litesvm_utils::{model, TestSVM};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_keypair::Keypair;
-use solana_message::Message;
-use solana_native_token::LAMPORTS_PER_SOL;
 use solana_program_pack::{IsInitialized, Pack};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
-use solana_transaction::Transaction;
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 use spl_token_2022_interface::{
     extension::{
@@ -50,10 +46,9 @@ use crate::{
     state::common::PlanStatus,
     tests::{
         constants::{PROGRAM_ID, SYSTEM_PROGRAM_ID},
-        cu_tracker::{is_tracking_enabled, record_cu},
         pda::{get_delegation_pda, get_plan_pda, get_subscription_authority_pda, get_subscription_pda},
+        utils::ModelTxExt,
     },
-    SubscriptionsInstruction,
 };
 
 /// Converts number of hours into seconds
@@ -79,51 +74,9 @@ pub fn token_balance<B: TestSVM>(backend: &B, ata: &Pubkey) -> u64 {
     account.amount
 }
 
-pub fn setup() -> (LiteSvmBackend, Keypair) {
-    let mut litesvm = LiteSVM::new();
-
-    let so_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/subscriptions_program.so");
-    litesvm.add_program_from_file(PROGRAM_ID.to_bytes(), so_path).unwrap();
-
-    let mut backend = LiteSvmBackend::new(litesvm);
-    backend.warp_to_timestamp(current_ts());
-
-    let default_payer = Keypair::new();
-    backend.fund_sol(&default_payer.pubkey(), LAMPORTS_PER_SOL * 100);
-
-    (backend, default_payer)
-}
-
 pub fn fetch_account<T: Pack + IsInitialized, B: TestSVM>(backend: &B, pubkey: &Pubkey) -> T {
     let account = backend.get_account(pubkey).unwrap();
     T::unpack(&account.data[..T::LEN]).unwrap()
-}
-
-#[allow(clippy::result_large_err)]
-pub fn build_and_send_transaction(
-    backend: &mut LiteSvmBackend,
-    signers: &[&Keypair],
-    payer: &Pubkey,
-    ix: &Instruction,
-) -> TransactionResult {
-    let litesvm = backend.svm_mut();
-    let tx = Transaction::new(signers, Message::new(std::slice::from_ref(ix), Some(payer)), litesvm.latest_blockhash());
-    let result = litesvm.send_transaction(tx);
-    litesvm.expire_blockhash();
-
-    if is_tracking_enabled() {
-        if let (Ok(meta), Ok(parsed)) = (result.as_ref(), SubscriptionsInstruction::from_bytes(&ix.data)) {
-            record_cu(&parsed.to_string(), meta.compute_units_consumed);
-        }
-    }
-
-    result
-}
-
-pub fn init_wallet(backend: &mut LiteSvmBackend, lamports: u64) -> Keypair {
-    let wallet = Keypair::new();
-    backend.fund_sol(&wallet.pubkey(), lamports);
-    wallet
 }
 
 pub fn init_mint<B: TestSVM>(
@@ -355,20 +308,27 @@ fn init_token_account_at<B: TestSVM>(
     token_account
 }
 
-pub fn initialize_subscription_authority_action(
-    backend: &mut LiteSvmBackend,
-    payer: &Keypair,
+/// Initialize `user`'s SubscriptionAuthority for `mint` as a silent setup send,
+/// routed through the engine-neutral [`TestSVM::send`] (asserted ok, not
+/// rendered). The optional sponsor is appended as a writable signer and becomes
+/// the fee payer (`signers[0]`). Returns the asserted record, the authority PDA,
+/// and its bump. The World path renders this instead through `World::init_authority`.
+pub fn initialize_subscription_authority_action<B: TestSVM>(
+    backend: &mut B,
+    user: &Keypair,
     mint: Pubkey,
-) -> (TransactionResult, Pubkey, u8) {
-    initialize_subscription_authority_action_with_sponsor(backend, payer, mint, None)
+) -> (model::Transaction, Pubkey, u8) {
+    initialize_subscription_authority_action_with_sponsor(backend, user, mint, None)
 }
 
-pub fn initialize_subscription_authority_action_with_sponsor(
-    backend: &mut LiteSvmBackend,
+/// See [`initialize_subscription_authority_action`]; this variant takes an
+/// optional `sponsor` that pays the rent and fee.
+pub fn initialize_subscription_authority_action_with_sponsor<B: TestSVM>(
+    backend: &mut B,
     user: &Keypair,
     mint: Pubkey,
     sponsor: Option<&Keypair>,
-) -> (TransactionResult, Pubkey, u8) {
+) -> (model::Transaction, Pubkey, u8) {
     let token_program = backend.get_account(&mint).unwrap().owner;
     let user_ata = get_associated_token_address_with_program_id(&user.pubkey(), &mint, &token_program);
     let (subscription_authority_pda, bump) = get_subscription_authority_pda(&user.pubkey(), &mint);
@@ -382,23 +342,21 @@ pub fn initialize_subscription_authority_action_with_sponsor(
         AccountMeta::new_readonly(token_program, false),
     ];
 
+    // `signers[0]` is the fee payer: the sponsor pays when one is set.
     let mut signers: Vec<&Keypair> = vec![user];
-    let mut fee_payer = user.pubkey();
-
     if let Some(sponsor) = sponsor {
         accounts.push(AccountMeta::new(sponsor.pubkey(), true));
-        signers.push(sponsor);
-        fee_payer = sponsor.pubkey();
+        signers.insert(0, sponsor);
     }
 
     let ix =
         Instruction { program_id: PROGRAM_ID, accounts, data: vec![*initialize_subscription_authority::DISCRIMINATOR] };
 
-    (build_and_send_transaction(backend, &signers, &fee_payer, &ix), subscription_authority_pda, bump)
+    (backend.send(&[ix], &signers).assert_success(), subscription_authority_pda, bump)
 }
 
 pub struct CreateDelegation<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     delegator: &'a Keypair,
     payer: Option<&'a Keypair>,
     mint: Pubkey,
@@ -409,9 +367,9 @@ pub struct CreateDelegation<'a, B: TestSVM> {
 }
 
 impl<'a, B: TestSVM> CreateDelegation<'a, B> {
-    pub fn new(litesvm: &'a mut B, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey) -> Self {
+    pub fn new(svm: &'a mut B, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey) -> Self {
         Self {
-            litesvm,
+            svm,
             delegator,
             payer: None,
             mint,
@@ -445,7 +403,7 @@ impl<'a, B: TestSVM> CreateDelegation<'a, B> {
     fn resolved_expected_subscription_authority_init_id(&self) -> i64 {
         self.expected_subscription_authority_init_id.unwrap_or_else(|| {
             let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.delegator.pubkey(), &self.mint);
-            self.litesvm
+            self.svm
                 .get_account(&subscription_authority_pda)
                 .and_then(|account| {
                     crate::state::SubscriptionAuthority::load(&account.data).ok().map(|authority| authority.init_id)
@@ -520,12 +478,12 @@ impl<'a, B: TestSVM> CreateDelegation<'a, B> {
     }
 }
 
-/// The send-driving builders stay on the concrete litesvm backend: they reach
-/// for `latest_blockhash` / `send_transaction` through `build_and_send_transaction`,
-/// which the `TestSVM` trait does not expose. The World path uses the `_ix`
-/// builders above instead and routes the send through the observing backend.
-impl<'a> CreateDelegation<'a, LiteSvmBackend> {
-    pub fn fixed(self, amount: u64, expiry_ts: i64) -> (TransactionResult, Pubkey) {
+/// The send-driving builders route through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends (asserted ok, not rendered into a report). The World
+/// path uses the `_ix` builders above instead and routes the send through the
+/// observing backend so the surface is captured.
+impl<'a, B: TestSVM> CreateDelegation<'a, B> {
+    pub fn fixed(self, amount: u64, expiry_ts: i64) -> (model::Transaction, Pubkey) {
         let nonce_bytes = self.nonce.to_le_bytes().to_vec();
         let expected_subscription_authority_init_id = self.resolved_expected_subscription_authority_init_id();
         self.execute(
@@ -546,7 +504,7 @@ impl<'a> CreateDelegation<'a, LiteSvmBackend> {
         period_length_s: u64,
         start_ts: i64,
         expiry_ts: i64,
-    ) -> (TransactionResult, Pubkey) {
+    ) -> (model::Transaction, Pubkey) {
         let nonce_bytes = self.nonce.to_le_bytes().to_vec();
         let expected_subscription_authority_init_id = self.resolved_expected_subscription_authority_init_id();
         self.execute(
@@ -563,20 +521,19 @@ impl<'a> CreateDelegation<'a, LiteSvmBackend> {
         )
     }
 
-    fn execute(self, discriminator: u8, data: Vec<u8>) -> (TransactionResult, Pubkey) {
+    fn execute(self, discriminator: u8, data: Vec<u8>) -> (model::Transaction, Pubkey) {
         let (ix, delegation_pda) = self.build_ix(discriminator, data);
+        // `signers[0]` is the fee payer: the sponsor pays when one is set.
         let mut signers = vec![self.delegator];
-        let mut fee_payer = self.delegator.pubkey();
         if let Some(p) = self.payer {
-            signers.push(p);
-            fee_payer = p.pubkey();
+            signers.insert(0, p);
         }
-        (build_and_send_transaction(self.litesvm, &signers, &fee_payer, &ix), delegation_pda)
+        (self.svm.send(&[ix], &signers).assert_success(), delegation_pda)
     }
 }
 
 pub struct TransferDelegation<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     signer: &'a Keypair,
     delegator: Pubkey,
     mint: Pubkey,
@@ -589,14 +546,14 @@ pub struct TransferDelegation<'a, B: TestSVM> {
 
 impl<'a, B: TestSVM> TransferDelegation<'a, B> {
     pub fn new(
-        litesvm: &'a mut B,
+        svm: &'a mut B,
         signer: &'a Keypair,
         delegator: Pubkey,
         mint: Pubkey,
         delegation_pda: Pubkey,
     ) -> Self {
         Self {
-            litesvm,
+            svm,
             signer,
             delegator,
             mint,
@@ -640,7 +597,7 @@ impl<'a, B: TestSVM> TransferDelegation<'a, B> {
     }
 
     fn build_ix(&self, discriminator: u8) -> Instruction {
-        let token_program = self.litesvm.get_account(&self.mint).unwrap().owner;
+        let token_program = self.svm.get_account(&self.mint).unwrap().owner;
         let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.delegator, &self.mint);
         let delegator_ata = self.source.unwrap_or_else(|| {
             get_associated_token_address_with_program_id(&self.delegator, &self.mint, &token_program)
@@ -684,26 +641,23 @@ impl<'a, B: TestSVM> TransferDelegation<'a, B> {
     }
 }
 
-impl<'a> TransferDelegation<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn fixed(self) -> TransactionResult {
+impl<'a, B: TestSVM> TransferDelegation<'a, B> {
+    pub fn fixed(self) -> model::Transaction {
         self.execute(*transfer_fixed_delegation::DISCRIMINATOR)
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn recurring(self) -> TransactionResult {
+    pub fn recurring(self) -> model::Transaction {
         self.execute(*transfer_recurring_delegation::DISCRIMINATOR)
     }
 
-    #[allow(clippy::result_large_err)]
-    fn execute(self, discriminator: u8) -> TransactionResult {
+    fn execute(self, discriminator: u8) -> model::Transaction {
         let ix = self.build_ix(discriminator);
-        build_and_send_transaction(self.litesvm, &[self.signer], &self.signer.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.signer]).assert_success()
     }
 }
 
 pub struct RevokeDelegation<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     delegator: &'a Keypair,
     signer: Option<&'a Keypair>,
     mint: Pubkey,
@@ -714,8 +668,8 @@ pub struct RevokeDelegation<'a, B: TestSVM> {
 }
 
 impl<'a, B: TestSVM> RevokeDelegation<'a, B> {
-    pub fn new(litesvm: &'a mut B, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey, nonce: u64) -> Self {
-        Self { litesvm, delegator, signer: None, mint, delegatee, nonce, receiver: None, custom_pda: None }
+    pub fn new(svm: &'a mut B, delegator: &'a Keypair, mint: Pubkey, delegatee: Pubkey, nonce: u64) -> Self {
+        Self { svm, delegator, signer: None, mint, delegatee, nonce, receiver: None, custom_pda: None }
     }
 
     pub fn signer(mut self, signer: &'a Keypair) -> Self {
@@ -751,21 +705,19 @@ impl<'a, B: TestSVM> RevokeDelegation<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> RevokeDelegation<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> RevokeDelegation<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let authority = self.signer.unwrap_or(self.delegator);
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[authority], &authority.pubkey(), &ix)
+        self.svm.send(&[ix], &[authority]).assert_success()
     }
 }
 
 pub struct CloseSubscriptionAuthority<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     user: &'a Keypair,
     mint: Pubkey,
     custom_pda: Option<Pubkey>,
@@ -773,8 +725,8 @@ pub struct CloseSubscriptionAuthority<'a, B: TestSVM> {
 }
 
 impl<'a, B: TestSVM> CloseSubscriptionAuthority<'a, B> {
-    pub fn new(litesvm: &'a mut B, user: &'a Keypair, mint: Pubkey) -> Self {
-        Self { litesvm, user, mint, custom_pda: None, receiver: None }
+    pub fn new(svm: &'a mut B, user: &'a Keypair, mint: Pubkey) -> Self {
+        Self { svm, user, mint, custom_pda: None, receiver: None }
     }
 
     pub fn pda(mut self, pda: Pubkey) -> Self {
@@ -802,28 +754,26 @@ impl<'a, B: TestSVM> CloseSubscriptionAuthority<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> CloseSubscriptionAuthority<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> CloseSubscriptionAuthority<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.user], &self.user.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.user]).assert_success()
     }
 }
 
 pub struct RevokeSubscriptionAuthority<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     user: &'a Keypair,
     mint: Pubkey,
     custom_ata: Option<Pubkey>,
 }
 
 impl<'a, B: TestSVM> RevokeSubscriptionAuthority<'a, B> {
-    pub fn new(litesvm: &'a mut B, user: &'a Keypair, mint: Pubkey) -> Self {
-        Self { litesvm, user, mint, custom_ata: None }
+    pub fn new(svm: &'a mut B, user: &'a Keypair, mint: Pubkey) -> Self {
+        Self { svm, user, mint, custom_ata: None }
     }
 
     pub fn ata(mut self, ata: Pubkey) -> Self {
@@ -833,7 +783,7 @@ impl<'a, B: TestSVM> RevokeSubscriptionAuthority<'a, B> {
 
     /// The `RevokeSubscriptionAuthority` instruction, built but not sent.
     pub fn instruction(&self) -> Instruction {
-        let token_program = self.litesvm.get_account(&self.mint).unwrap().owner;
+        let token_program = self.svm.get_account(&self.mint).unwrap().owner;
         let derived_ata = get_associated_token_address_with_program_id(&self.user.pubkey(), &self.mint, &token_program);
         let user_ata = self.custom_ata.unwrap_or(derived_ata);
 
@@ -848,20 +798,18 @@ impl<'a, B: TestSVM> RevokeSubscriptionAuthority<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> RevokeSubscriptionAuthority<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> RevokeSubscriptionAuthority<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.user], &self.user.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.user]).assert_success()
     }
 }
 
 pub struct RevokeAbandonedDelegation<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     payer: &'a Keypair,
     delegator: Pubkey,
     mint: Pubkey,
@@ -873,13 +821,13 @@ pub struct RevokeAbandonedDelegation<'a, B: TestSVM> {
 
 impl<'a, B: TestSVM> RevokeAbandonedDelegation<'a, B> {
     pub fn new(
-        litesvm: &'a mut B,
+        svm: &'a mut B,
         payer: &'a Keypair,
         delegator: Pubkey,
         mint: Pubkey,
         delegatee: Pubkey,
     ) -> Self {
-        Self { litesvm, payer, delegator, mint, delegatee, nonce: 0, custom_pda: None, custom_authority: None }
+        Self { svm, payer, delegator, mint, delegatee, nonce: 0, custom_pda: None, custom_authority: None }
     }
 
     pub fn nonce(mut self, nonce: u64) -> Self {
@@ -914,20 +862,18 @@ impl<'a, B: TestSVM> RevokeAbandonedDelegation<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> RevokeAbandonedDelegation<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> RevokeAbandonedDelegation<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.payer], &self.payer.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.payer]).assert_success()
     }
 }
 
 pub struct CreatePlan<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     owner: &'a Keypair,
     data: PlanData,
     destinations_vec: Vec<Pubkey>,
@@ -936,10 +882,10 @@ pub struct CreatePlan<'a, B: TestSVM> {
 }
 
 impl<'a, B: TestSVM> CreatePlan<'a, B> {
-    pub fn new(litesvm: &'a mut B, owner: &'a Keypair, mint: Pubkey) -> Self {
+    pub fn new(svm: &'a mut B, owner: &'a Keypair, mint: Pubkey) -> Self {
         let zero_addr: pinocchio::Address = [0u8; 32].into();
         Self {
-            litesvm,
+            svm,
             owner,
             data: PlanData {
                 plan_id: 0,
@@ -1031,7 +977,7 @@ impl<'a, B: TestSVM> CreatePlan<'a, B> {
 
         let mint_pubkey = Pubkey::new_from_array(self.data.mint.to_bytes());
         let token_program = self
-            .litesvm
+            .svm
             .get_account(&mint_pubkey)
             .map(|a| a.owner)
             .unwrap_or(crate::tests::constants::TOKEN_PROGRAM_ID);
@@ -1049,21 +995,19 @@ impl<'a, B: TestSVM> CreatePlan<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> CreatePlan<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> (TransactionResult, Pubkey) {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> CreatePlan<'a, B> {
+    pub fn execute(self) -> (model::Transaction, Pubkey) {
         let ix = self.instruction();
         let plan_pda = self.plan_pda();
-        (build_and_send_transaction(self.litesvm, &[self.owner], &self.owner.pubkey(), &ix), plan_pda)
+        (self.svm.send(&[ix], &[self.owner]).assert_success(), plan_pda)
     }
 }
 
 pub struct UpdatePlan<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     owner: &'a Keypair,
     plan_pda: Pubkey,
     pullers_vec: Vec<Pubkey>,
@@ -1071,10 +1015,10 @@ pub struct UpdatePlan<'a, B: TestSVM> {
 }
 
 impl<'a, B: TestSVM> UpdatePlan<'a, B> {
-    pub fn new(litesvm: &'a mut B, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
+    pub fn new(svm: &'a mut B, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
         let zero_addr: pinocchio::Address = [0u8; 32].into();
         Self {
-            litesvm,
+            svm,
             owner,
             plan_pda,
             pullers_vec: vec![],
@@ -1140,27 +1084,25 @@ impl<'a, B: TestSVM> UpdatePlan<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> UpdatePlan<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> UpdatePlan<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.owner], &self.owner.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.owner]).assert_success()
     }
 }
 
 pub struct DeletePlan<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     owner: &'a Keypair,
     plan_pda: Pubkey,
 }
 
 impl<'a, B: TestSVM> DeletePlan<'a, B> {
-    pub fn new(litesvm: &'a mut B, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
-        Self { litesvm, owner, plan_pda }
+    pub fn new(svm: &'a mut B, owner: &'a Keypair, plan_pda: Pubkey) -> Self {
+        Self { svm, owner, plan_pda }
     }
 
     /// The `DeletePlan` instruction, built but not sent.
@@ -1171,20 +1113,18 @@ impl<'a, B: TestSVM> DeletePlan<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> DeletePlan<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> DeletePlan<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.owner], &self.owner.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.owner]).assert_success()
     }
 }
 
 pub struct CreateSubscription<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     plan_pda: Pubkey,
     subscriber: Pubkey,
     mint: Pubkey,
@@ -1196,14 +1136,14 @@ pub struct CreateSubscription<'a, B: TestSVM> {
 
 impl<'a, B: TestSVM> CreateSubscription<'a, B> {
     pub fn new(
-        litesvm: &'a mut B,
+        svm: &'a mut B,
         plan_pda: Pubkey,
         subscriber: Pubkey,
         mint: Pubkey,
         period_start_ts: i64,
     ) -> Self {
         Self {
-            litesvm,
+            svm,
             plan_pda,
             subscriber,
             mint,
@@ -1237,7 +1177,7 @@ impl<'a, B: TestSVM> CreateSubscription<'a, B> {
         };
 
         let (md_pda, _) = get_subscription_authority_pda(&self.subscriber, &self.mint);
-        let md_account = self.litesvm.get_account(&md_pda).unwrap();
+        let md_account = self.svm.get_account(&md_pda).unwrap();
         let md = SubscriptionAuthority::load(&md_account.data).unwrap();
         let init_id = md.init_id;
 
@@ -1267,7 +1207,7 @@ impl<'a, B: TestSVM> CreateSubscription<'a, B> {
         };
 
         let lamports = rent_exempt_lamports(data.len());
-        self.litesvm.set_account(
+        self.svm.set_account(
             &subscription_pda,
             Account { lamports, data: data.to_vec(), owner: PROGRAM_ID, executable: false, rent_epoch: 0 },
         );
@@ -1277,7 +1217,7 @@ impl<'a, B: TestSVM> CreateSubscription<'a, B> {
 }
 
 pub struct TransferSubscription<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     caller: &'a Keypair,
     delegator: Pubkey,
     mint: Pubkey,
@@ -1289,14 +1229,14 @@ pub struct TransferSubscription<'a, B: TestSVM> {
 
 impl<'a, B: TestSVM> TransferSubscription<'a, B> {
     pub fn new(
-        litesvm: &'a mut B,
+        svm: &'a mut B,
         caller: &'a Keypair,
         delegator: Pubkey,
         mint: Pubkey,
         subscription_pda: Pubkey,
         plan_pda: Pubkey,
     ) -> Self {
-        Self { litesvm, caller, delegator, mint, subscription_pda, plan_pda, amount: 0, receiver: None }
+        Self { svm, caller, delegator, mint, subscription_pda, plan_pda, amount: 0, receiver: None }
     }
 
     pub fn amount(mut self, amount: u64) -> Self {
@@ -1311,7 +1251,7 @@ impl<'a, B: TestSVM> TransferSubscription<'a, B> {
 
     /// The `TransferSubscription` instruction, built but not sent.
     pub fn instruction(&self) -> Instruction {
-        let token_program = self.litesvm.get_account(&self.mint).unwrap().owner;
+        let token_program = self.svm.get_account(&self.mint).unwrap().owner;
         let (subscription_authority_pda, _) = get_subscription_authority_pda(&self.delegator, &self.mint);
         let delegator_ata = get_associated_token_address_with_program_id(&self.delegator, &self.mint, &token_program);
 
@@ -1347,20 +1287,18 @@ impl<'a, B: TestSVM> TransferSubscription<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> TransferSubscription<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> TransferSubscription<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.caller], &self.caller.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.caller]).assert_success()
     }
 }
 
 pub struct Subscribe<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     subscriber: &'a Keypair,
     merchant: Pubkey,
     plan_pda: Pubkey,
@@ -1372,7 +1310,7 @@ pub struct Subscribe<'a, B: TestSVM> {
 
 impl<'a, B: TestSVM> Subscribe<'a, B> {
     pub fn new(
-        litesvm: &'a mut B,
+        svm: &'a mut B,
         subscriber: &'a Keypair,
         merchant: Pubkey,
         plan_pda: Pubkey,
@@ -1380,7 +1318,7 @@ impl<'a, B: TestSVM> Subscribe<'a, B> {
         plan_bump: u8,
         mint: Pubkey,
     ) -> Self {
-        Self { litesvm, subscriber, merchant, plan_pda, plan_id, plan_bump, mint, payer: None }
+        Self { svm, subscriber, merchant, plan_pda, plan_id, plan_bump, mint, payer: None }
     }
 
     pub fn payer(mut self, payer: &'a Keypair) -> Self {
@@ -1417,14 +1355,14 @@ impl<'a, B: TestSVM> Subscribe<'a, B> {
         }
 
         // Snapshot live plan terms to bind subscriber consent.
-        let plan_account = self.litesvm.get_account(&self.plan_pda).unwrap();
+        let plan_account = self.svm.get_account(&self.plan_pda).unwrap();
         let plan = crate::state::Plan::load(&plan_account.data).unwrap();
         let expected_amount = plan.data.terms.amount;
         let expected_period_hours = plan.data.terms.period_hours;
         let expected_created_at = plan.data.terms.created_at;
         let expected_mint = plan.data.mint;
         let expected_subscription_authority_init_id = self
-            .litesvm
+            .svm
             .get_account(&subscription_authority_pda)
             .and_then(|account| {
                 crate::state::SubscriptionAuthority::load(&account.data).ok().map(|authority| authority.init_id)
@@ -1448,34 +1386,31 @@ impl<'a, B: TestSVM> Subscribe<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> Subscribe<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> Subscribe<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
+        // `signers[0]` is the fee payer: the sponsor pays when one is set.
         let mut signers: Vec<&Keypair> = vec![self.subscriber];
-        let mut fee_payer = self.subscriber.pubkey();
         if let Some(p) = self.payer {
-            signers.push(p);
-            fee_payer = p.pubkey();
+            signers.insert(0, p);
         }
-        build_and_send_transaction(self.litesvm, &signers, &fee_payer, &ix)
+        self.svm.send(&[ix], &signers).assert_success()
     }
 }
 
 pub struct CancelSubscription<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     subscriber: &'a Keypair,
     plan_pda: Pubkey,
     subscription_pda: Pubkey,
 }
 
 impl<'a, B: TestSVM> CancelSubscription<'a, B> {
-    pub fn new(litesvm: &'a mut B, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
-        Self { litesvm, subscriber, plan_pda, subscription_pda }
+    pub fn new(svm: &'a mut B, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
+        Self { svm, subscriber, plan_pda, subscription_pda }
     }
 
     /// The `CancelSubscription` instruction, built but not sent.
@@ -1493,28 +1428,26 @@ impl<'a, B: TestSVM> CancelSubscription<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> CancelSubscription<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> CancelSubscription<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.subscriber], &self.subscriber.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.subscriber]).assert_success()
     }
 }
 
 pub struct ResumeSubscription<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     subscriber: &'a Keypair,
     plan_pda: Pubkey,
     subscription_pda: Pubkey,
 }
 
 impl<'a, B: TestSVM> ResumeSubscription<'a, B> {
-    pub fn new(litesvm: &'a mut B, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
-        Self { litesvm, subscriber, plan_pda, subscription_pda }
+    pub fn new(svm: &'a mut B, subscriber: &'a Keypair, plan_pda: Pubkey, subscription_pda: Pubkey) -> Self {
+        Self { svm, subscriber, plan_pda, subscription_pda }
     }
 
     /// The `ResumeSubscription` instruction, built but not sent.
@@ -1532,61 +1465,18 @@ impl<'a, B: TestSVM> ResumeSubscription<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> ResumeSubscription<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> ResumeSubscription<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.subscriber], &self.subscriber.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.subscriber]).assert_success()
     }
 }
 
-pub fn setup_with_subscription() -> (
-    LiteSvmBackend,
-    Keypair, // alice (subscriber)
-    Keypair, // merchant
-    Pubkey,  // mint
-    Pubkey,  // plan_pda
-    u8,      // plan_bump
-    Pubkey,  // subscription_pda
-) {
-    use crate::tests::{
-        asserts::TransactionResultExt,
-        constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
-        pda::get_subscription_pda,
-    };
-
-    let (mut litesvm, alice) = setup();
-    let merchant = Keypair::new();
-    litesvm.fund_sol(&merchant.pubkey(), 10_000_000_000);
-
-    let mint = init_mint(&mut litesvm, TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, Some(alice.pubkey()), &[]);
-    let _alice_ata = init_ata(&mut litesvm, mint, alice.pubkey(), 100_000_000);
-
-    initialize_subscription_authority_action(&mut litesvm, &alice, mint).0.assert_ok();
-
-    let end_ts = current_ts() + days(30) as i64;
-    let (res, plan_pda) = CreatePlan::new(&mut litesvm, &merchant, mint)
-        .plan_id(1)
-        .amount(50_000_000)
-        .period_hours(1)
-        .end_ts(end_ts)
-        .execute();
-    res.assert_ok();
-
-    let (_, plan_bump) = get_plan_pda(&merchant.pubkey(), 1);
-    Subscribe::new(&mut litesvm, &alice, merchant.pubkey(), plan_pda, 1, plan_bump, mint).execute().assert_ok();
-
-    let (subscription_pda, _) = get_subscription_pda(&plan_pda, &alice.pubkey());
-
-    (litesvm, alice, merchant, mint, plan_pda, plan_bump, subscription_pda)
-}
-
 pub struct RevokeSubscription<'a, B: TestSVM> {
-    litesvm: &'a mut B,
+    svm: &'a mut B,
     authority: &'a Keypair,
     subscription_pda: Pubkey,
     plan_pda: Pubkey,
@@ -1594,8 +1484,8 @@ pub struct RevokeSubscription<'a, B: TestSVM> {
 }
 
 impl<'a, B: TestSVM> RevokeSubscription<'a, B> {
-    pub fn new(litesvm: &'a mut B, authority: &'a Keypair, subscription_pda: Pubkey, plan_pda: Pubkey) -> Self {
-        Self { litesvm, authority, subscription_pda, plan_pda, receiver: None }
+    pub fn new(svm: &'a mut B, authority: &'a Keypair, subscription_pda: Pubkey, plan_pda: Pubkey) -> Self {
+        Self { svm, authority, subscription_pda, plan_pda, receiver: None }
     }
 
     pub fn receiver(mut self, receiver: Pubkey) -> Self {
@@ -1620,14 +1510,12 @@ impl<'a, B: TestSVM> RevokeSubscription<'a, B> {
 
 }
 
-/// The send-driving `execute` stays on the concrete litesvm backend
-/// (`build_and_send_transaction` reaches for `latest_blockhash` /
-/// `send_transaction`, which `TestSVM` does not expose). The World path builds
-/// `.instruction()` and routes the send through the observing backend.
-impl<'a> RevokeSubscription<'a, LiteSvmBackend> {
-    #[allow(clippy::result_large_err)]
-    pub fn execute(self) -> TransactionResult {
+/// The send-driving `execute` routes through the engine-neutral [`TestSVM::send`]
+/// for silent setup sends. The World path builds `.instruction()` and routes the
+/// send through the observing backend so the surface is captured.
+impl<'a, B: TestSVM> RevokeSubscription<'a, B> {
+    pub fn execute(self) -> model::Transaction {
         let ix = self.instruction();
-        build_and_send_transaction(self.litesvm, &[self.authority], &self.authority.pubkey(), &ix)
+        self.svm.send(&[ix], &[self.authority]).assert_success()
     }
 }
