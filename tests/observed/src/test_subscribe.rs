@@ -15,7 +15,6 @@ use subscriptions::{
     state::{Plan, SubscriptionAuthority, SubscriptionDelegation},
 };
 use tests_subscriptions::tests::{
-    asserts::TransactionResultExt,
     constants::{MINT_DECIMALS, PROGRAM_ID, SYSTEM_PROGRAM_ID, TOKEN_PROGRAM_ID},
     pda::{get_plan_pda, get_subscription_authority_pda, get_subscription_pda},
     utils::{days, init_ata, init_mint, initialize_subscription_authority_action, CreatePlan},
@@ -51,15 +50,16 @@ fn subscribe_with_sponsor_tells_who_pays() {
 
     // --- setup sends through their builders (must succeed; not the focus) ---
     md.step("Set the stage: Alice's authority, the merchant's plan");
-    initialize_subscription_authority_action(&mut backend, &alice, mint).0.assert_ok();
+    // The setup sends route through the engine-neutral `TestSVM::send` and assert
+    // success internally (silent setup, not the observed action under test).
+    initialize_subscription_authority_action(&mut backend, &alice, mint);
     let end_ts = NOW + days(30) as i64;
-    let (plan_res, plan_pda) = CreatePlan::new(&mut backend, &merchant, mint)
+    let (_, plan_pda) = CreatePlan::new(&mut backend, &merchant, mint)
         .plan_id(1)
         .amount(50_000_000)
         .period_hours(1)
         .end_ts(end_ts)
         .execute();
-    plan_res.assert_ok();
     let (_, plan_bump) = get_plan_pda(&merchant.pubkey(), 1);
 
     let (subscription_authority_pda, _) = get_subscription_authority_pda(&alice.pubkey(), &mint);
