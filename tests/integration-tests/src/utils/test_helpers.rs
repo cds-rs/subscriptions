@@ -1,6 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::vec::Vec;
 
+pub use scenarios::helpers::{days, minutes, rent_exempt_lamports};
+
 use litesvm::{types::TransactionResult, LiteSVM};
 use solana_account::Account;
 use solana_clock::Clock;
@@ -54,19 +56,9 @@ use crate::{
     SubscriptionsInstruction,
 };
 
-/// Converts number of minutes into seconds
-pub fn minutes(mins: u64) -> u64 {
-    mins * 60
-}
-
 /// Converts number of hours into seconds
 pub fn hours(hours: u64) -> u64 {
     hours * minutes(60)
-}
-
-/// Converts number of days into seconds
-pub fn days(days: u64) -> u64 {
-    days * hours(24)
 }
 
 pub fn current_ts() -> i64 {
