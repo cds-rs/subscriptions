@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    9uq8CY5b_3yxk[("9uq8CY5b…3yxk")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    D3eW9XNC_TCA5[("D3eW9XNC…TCA5")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 9uq8CY5b_3yxk
+    subscriptions -->|writes| D3eW9XNC_TCA5
+    Token -->|writes| D3eW9XNC_TCA5
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    9uq8CY5b_3yxk[("9uq8CY5b…3yxk")]:::account
+    D3eW9XNC_TCA5[("D3eW9XNC…TCA5")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 9uq8CY5b_3yxk
+    Token -->|owns| D3eW9XNC_TCA5
 ```
 
 **CreatePlan: structured CPI tree**
 
 ```text
 
+── subscriptions::CreatePlan ───────────────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **CreatePlan: sequence diagram**
@@ -134,9 +140,11 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     merchant([merchant]):::signer
-    Plan[(Plan)]:::writable
+    Plan([Plan]):::signer
     System[System]:::program
     merchant -->|signs| subscriptions
+    merchant -->|signs| System
+    Plan -->|signs| System
     subscriptions -->|writes| Plan
 ```
 
@@ -158,6 +166,7 @@ flowchart LR
 
 ```text
 
+── subscriptions::Subscribe ────────────────────────────────
 Transaction  signers=[alice]
 └── subscriptions::Subscribe [1] ✓ 6516cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -170,8 +179,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 6516
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **Subscribe: sequence diagram**
@@ -212,9 +221,13 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    Subscription[(Subscription)]:::writable
+    Subscription([Subscription]):::signer
     System[System]:::program
+    EventAuthority([EventAuthority]):::signer
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    Subscription -->|signs| System
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| Subscription
 ```
 
@@ -238,14 +251,15 @@ flowchart LR
 
 ```text
 
+── subscriptions::CancelSubscription ───────────────────────
 Transaction  signers=[alice]
 └── subscriptions::CancelSubscription [1] ✓ 1931cu  signer=alice
     └── subscriptions::EmitEvent [2] ✓ 137cu
 Compute Units (this run): 1931
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CancelSubscription: sequence diagram**
@@ -282,7 +296,9 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     Subscription[(Subscription)]:::writable
+    EventAuthority([EventAuthority]):::signer
     alice -->|signs| subscriptions
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| Subscription
 ```
 
@@ -306,15 +322,16 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferSubscription ─────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::TransferSubscription [1] ✗ 1122cu  signer=merchant
-    └── Error: SubscriptionCancelled
+    └── Error: SubscriptionCancelled (0x1fc)
 Error: InstructionError(0, Custom(508))
 Compute Units (this run): 1122
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 ### Alice's resume is refused for the same reason
@@ -323,13 +340,14 @@ Legend (2):
 
 ```text
 
+── subscriptions::ResumeSubscription ───────────────────────
 Transaction  signers=[alice]
 └── subscriptions::ResumeSubscription [1] ✗ 468cu  signer=alice
-    └── Error: SubscriptionCancelled
+    └── Error: SubscriptionCancelled (0x1fc)
 Error: InstructionError(0, Custom(508))
 Compute Units (this run): 468
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```

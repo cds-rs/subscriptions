@@ -6,6 +6,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 10742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -13,8 +14,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 10742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -57,13 +58,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    9EXNTmmk_RyqW[("9EXNTmmk…RyqW")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    GN5De9bb_aXH8[("GN5De9bb…aXH8")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 9EXNTmmk_RyqW
+    subscriptions -->|writes| GN5De9bb_aXH8
+    Token -->|writes| GN5De9bb_aXH8
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -77,10 +82,10 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    9EXNTmmk_RyqW[("9EXNTmmk…RyqW")]:::account
+    GN5De9bb_aXH8[("GN5De9bb…aXH8")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 9EXNTmmk_RyqW
+    Token -->|owns| GN5De9bb_aXH8
 ```
 
 ### Alice creates a sponsor-funded recurring delegation
@@ -89,15 +94,16 @@ flowchart LR
 
 ```text
 
+── subscriptions::CreateRecurringDelegation ────────────────
 Transaction  signers=[sponsor, alice]
 └── subscriptions::CreateRecurringDelegation [1] ✓ 5101cu  signer=[alice, sponsor]
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 5101
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```
 
 **CreateRecurringDelegation (sponsored): sequence diagram**
@@ -136,11 +142,13 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    Delegation[(Delegation)]:::writable
+    Delegation([Delegation]):::signer
     sponsor([sponsor]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
     sponsor -->|signs| subscriptions
+    sponsor -->|signs| System
+    Delegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| Delegation
 ```
@@ -169,13 +177,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::RevokeDelegation ─────────────────────────
 Transaction  signers=[sponsor]
 └── subscriptions::RevokeDelegation [1] ✓ 429cu  signer=sponsor
 Compute Units (this run): 429
 Fee: 5000 lamports
 Legend (2):
-  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
 ```
 
 **RevokeDelegation (by sponsor): sequence diagram**
@@ -221,5 +230,7 @@ flowchart LR
     classDef account fill:#fff3cd,stroke:#ffc107;
     System[System]:::owner
     sponsor[(sponsor)]:::account
+    Delegation[(Delegation)]:::account
     System -->|owns| sponsor
+    System -->|owns| Delegation
 ```

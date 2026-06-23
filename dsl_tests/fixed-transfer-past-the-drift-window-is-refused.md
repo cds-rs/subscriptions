@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 10742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 7742
+Compute Units (this run): 10742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (10742cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (7742cu)
+    subscriptions -->>- alice: ok (10742cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    BqSLr1Ua_KYA8[("BqSLr1Ua…KYA8")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    CBQ4uDDZ_oPjg[("CBQ4uDDZ…oPjg")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| BqSLr1Ua_KYA8
+    subscriptions -->|writes| CBQ4uDDZ_oPjg
+    Token -->|writes| CBQ4uDDZ_oPjg
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    BqSLr1Ua_KYA8[("BqSLr1Ua…KYA8")]:::account
+    CBQ4uDDZ_oPjg[("CBQ4uDDZ…oPjg")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| BqSLr1Ua_KYA8
+    Token -->|owns| CBQ4uDDZ_oPjg
 ```
 
 **CreateFixedDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateFixedDelegation ────────────────────
 Transaction  signers=[alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 3538cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3538
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateFixedDelegation: sequence diagram**
@@ -135,9 +141,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    FixedDelegation[(FixedDelegation)]:::writable
+    FixedDelegation([FixedDelegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    FixedDelegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| FixedDelegation
 ```
@@ -164,13 +172,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferFixed ────────────────────────────
 Transaction  signers=[bob]
 └── subscriptions::TransferFixed [1] ✗ 871cu  signer=bob
-    └── Error: DelegationExpired
+    └── Error: DelegationExpired (0x80)
 Error: InstructionError(0, Custom(128))
 Compute Units (this run): 871
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```

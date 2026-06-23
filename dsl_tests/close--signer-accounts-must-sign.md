@@ -6,6 +6,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -13,8 +14,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 6242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -57,13 +58,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    DNMc2J2S_Vjyq[("DNMc2J2S…Vjyq")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    2V1TDexf_QK3x[("2V1TDexf…QK3x")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| DNMc2J2S_Vjyq
+    subscriptions -->|writes| 2V1TDexf_QK3x
+    Token -->|writes| 2V1TDexf_QK3x
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -77,23 +82,24 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    DNMc2J2S_Vjyq[("DNMc2J2S…Vjyq")]:::account
+    2V1TDexf_QK3x[("2V1TDexf…QK3x")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| DNMc2J2S_Vjyq
+    Token -->|owns| 2V1TDexf_QK3x
 ```
 
 **CloseSubscriptionAuthority (user forced non-signer): structured CPI tree**
 
 ```text
 
+── subscriptions::CloseSubscriptionAuthority ───────────────
 Transaction  signers=[sponsor]
 └── subscriptions::CloseSubscriptionAuthority [1] ✗ 158cu
-    └── Error: NotSigner
+    └── Error: NotSigner (0x64)
 Error: InstructionError(0, Custom(100))
 Compute Units (this run): 158
 Fee: 5000 lamports
 Legend (2):
-  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
 ```

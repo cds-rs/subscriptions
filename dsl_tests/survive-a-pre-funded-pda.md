@@ -8,17 +8,18 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 13018cu  signer=alice
-    ├── System::Transfer [2] ✓ (no cu)
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 17518cu  signer=alice
+    ├── System::Transfer (alice -> SubAuthority) 1,627,640 lamports [2] ✓ (no cu)
     ├── System::Allocate [2] ✓ (no cu)
     ├── System::Assign [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 13018
+Compute Units (this run): 17518
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -30,8 +31,8 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (13018cu)
-    subscriptions ->> System: Transfer
+    alice ->> subscriptions: InitSubscriptionAuthority (17518cu)
+    subscriptions ->> System: Transfer (alice → SubAuthority) 1,627,640 lamports
     subscriptions ->> System: Allocate
     subscriptions ->> System: Assign
     subscriptions ->> Token: Approve (126cu)
@@ -47,7 +48,7 @@ sequenceDiagram
     participant System
     participant Token
     alice ->>+ subscriptions: InitSubscriptionAuthority
-    subscriptions ->>+ System: Transfer
+    subscriptions ->>+ System: Transfer (alice → SubAuthority) 1,627,640 lamports
     System -->>- subscriptions: ok
     subscriptions ->>+ System: Allocate
     System -->>- subscriptions: ok
@@ -55,7 +56,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (13018cu)
+    subscriptions -->>- alice: ok (17518cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -67,13 +68,18 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    2wZuJCG2_fdZR[("2wZuJCG2…fdZR")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    6NQM5qwU_Z2vo[("6NQM5qwU…Z2vo")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 2wZuJCG2_fdZR
+    subscriptions -->|writes| 6NQM5qwU_Z2vo
+    System -->|writes| SubAuthority
+    Token -->|writes| 6NQM5qwU_Z2vo
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -87,8 +93,8 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    2wZuJCG2_fdZR[("2wZuJCG2…fdZR")]:::account
+    6NQM5qwU_Z2vo[("6NQM5qwU…Z2vo")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 2wZuJCG2_fdZR
+    Token -->|owns| 6NQM5qwU_Z2vo
 ```

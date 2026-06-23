@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 6242
+Compute Units (this run): 9242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (6242cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (9242cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (6242cu)
+    subscriptions -->>- alice: ok (9242cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    B1ukCX5A_Sy1s[("B1ukCX5A…Sy1s")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    7dGnCJiW_TRmJ[("7dGnCJiW…TRmJ")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| B1ukCX5A_Sy1s
+    subscriptions -->|writes| 7dGnCJiW_TRmJ
+    Token -->|writes| 7dGnCJiW_TRmJ
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,15 +84,15 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    B1ukCX5A_Sy1s[("B1ukCX5A…Sy1s")]:::account
+    7dGnCJiW_TRmJ[("7dGnCJiW…TRmJ")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| B1ukCX5A_Sy1s
+    Token -->|owns| 7dGnCJiW_TRmJ
 ```
 
 - [x] the account is tagged SubscriptionAuthority: `0`
 - [x] the authority's user is Alice: `FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF`
-- [x] the authority's mint is the USDC mint: `1115GhuAQTKhDxzjVEt29z3f2cwZLh9sVtBgRPDBXk5`
+- [x] the authority's mint is the USDC mint: `1115WTqJZaR5apoirYhykavzcMT46ELhV5HiHMRRSJN`
 - [x] the payer defaults to Alice: `FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF`
-- [x] the ATA is delegated to the authority: `9YSzZMcH8qTe25swYhqTTRYnoKexSPfnM38fhscqA1pS`
+- [x] the ATA is delegated to the authority: `6MkuaYGMKy1wn4M62mhztZTQH3tgMucN3GSaMEDFLegQ`
 - [x] the delegated amount is u64::MAX: `18446744073709551615`

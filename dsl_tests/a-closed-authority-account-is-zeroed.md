@@ -6,6 +6,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -13,8 +14,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 9242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -57,13 +58,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    9Vct9uPL_iNRB[("9Vct9uPL…iNRB")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    5gMp5fLp_tJpS[("5gMp5fLp…tJpS")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 9Vct9uPL_iNRB
+    subscriptions -->|writes| 5gMp5fLp_tJpS
+    Token -->|writes| 5gMp5fLp_tJpS
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -77,10 +82,10 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    9Vct9uPL_iNRB[("9Vct9uPL…iNRB")]:::account
+    5gMp5fLp_tJpS[("5gMp5fLp…tJpS")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 9Vct9uPL_iNRB
+    Token -->|owns| 5gMp5fLp_tJpS
 ```
 
 ### Alice closes her authority
@@ -89,13 +94,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::CloseSubscriptionAuthority ───────────────
 Transaction  signers=[alice]
 └── subscriptions::CloseSubscriptionAuthority [1] ✓ 1832cu  signer=alice
 Compute Units (this run): 1832
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CloseSubscriptionAuthority: sequence diagram**
@@ -141,5 +147,7 @@ flowchart LR
     classDef account fill:#fff3cd,stroke:#ffc107;
     System[System]:::owner
     alice[(alice)]:::account
+    SubAuthority[(SubAuthority)]:::account
     System -->|owns| alice
+    System -->|owns| SubAuthority
 ```

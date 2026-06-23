@@ -6,15 +6,16 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 6242
+Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -26,7 +27,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (6242cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -45,7 +46,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (6242cu)
+    subscriptions -->>- alice: ok (7742cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -57,13 +58,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    CoKgLM78_QTJe[("CoKgLM78…QTJe")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    BqVdXE9L_ko7n[("BqVdXE9L…ko7n")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| CoKgLM78_QTJe
+    subscriptions -->|writes| BqVdXE9L_ko7n
+    Token -->|writes| BqVdXE9L_ko7n
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -77,10 +82,10 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    CoKgLM78_QTJe[("CoKgLM78…QTJe")]:::account
+    BqVdXE9L_ko7n[("BqVdXE9L…ko7n")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| CoKgLM78_QTJe
+    Token -->|owns| BqVdXE9L_ko7n
 ```
 
 ### Alice (with the sponsor paying rent) creates a fixed delegation
@@ -89,15 +94,16 @@ flowchart LR
 
 ```text
 
+── subscriptions::CreateFixedDelegation ────────────────────
 Transaction  signers=[sponsor, alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 3564cu  signer=[alice, sponsor]
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3564
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```
 
 **CreateFixedDelegation: sequence diagram**
@@ -136,11 +142,13 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    Delegation[(Delegation)]:::writable
+    Delegation([Delegation]):::signer
     sponsor([sponsor]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
     sponsor -->|signs| subscriptions
+    sponsor -->|signs| System
+    Delegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| Delegation
 ```
@@ -169,13 +177,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::CloseSubscriptionAuthority ───────────────
 Transaction  signers=[alice]
 └── subscriptions::CloseSubscriptionAuthority [1] ✓ 1832cu  signer=alice
 Compute Units (this run): 1832
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CloseSubscriptionAuthority: sequence diagram**
@@ -221,7 +230,9 @@ flowchart LR
     classDef account fill:#fff3cd,stroke:#ffc107;
     System[System]:::owner
     alice[(alice)]:::account
+    SubAuthority[(SubAuthority)]:::account
     System -->|owns| alice
+    System -->|owns| SubAuthority
 ```
 
 ### The sponsor sweeps but points at an unrelated authority account
@@ -230,13 +241,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::RevokeAbandonedDelegation ────────────────
 Transaction  signers=[sponsor]
 └── subscriptions::RevokeAbandonedDelegation [1] ✗ 284cu  signer=sponsor
-    └── Error: Unauthorized
+    └── Error: Unauthorized (0x82)
 Error: InstructionError(0, Custom(130))
 Compute Units (this run): 284
 Fee: 5000 lamports
 Legend (2):
-  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
 ```

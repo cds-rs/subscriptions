@@ -8,16 +8,17 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[sponsor, alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 13764cu  signer=[alice, sponsor]
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 9264cu  signer=[alice, sponsor]
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 13764
+Compute Units (this run): 9264
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -29,7 +30,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (13764cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (9264cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -48,7 +49,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (13764cu)
+    subscriptions -->>- alice: ok (9264cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -60,15 +61,19 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    F1399neB_36Dm[("F1399neB…36Dm")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    8Sb62NXN_qfiq[("8Sb62NXN…qfiq")]:::writable
     sponsor([sponsor]):::signer
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
     sponsor -->|signs| subscriptions
+    sponsor -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| F1399neB_36Dm
+    subscriptions -->|writes| 8Sb62NXN_qfiq
+    Token -->|writes| 8Sb62NXN_qfiq
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -82,11 +87,11 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    F1399neB_36Dm[("F1399neB…36Dm")]:::account
+    8Sb62NXN_qfiq[("8Sb62NXN…qfiq")]:::account
     sponsor[(sponsor)]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| F1399neB_36Dm
+    Token -->|owns| 8Sb62NXN_qfiq
     System -->|owns| sponsor
 ```
 

@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 9242
+Compute Units (this run): 6242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (9242cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (6242cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (9242cu)
+    subscriptions -->>- alice: ok (6242cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    7gkwGBrB_PtEn[("7gkwGBrB…PtEn")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    Fn43Rsod_QAXD[("Fn43Rsod…QAXD")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 7gkwGBrB_PtEn
+    subscriptions -->|writes| Fn43Rsod_QAXD
+    Token -->|writes| Fn43Rsod_QAXD
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    7gkwGBrB_PtEn[("7gkwGBrB…PtEn")]:::account
+    Fn43Rsod_QAXD[("Fn43Rsod…QAXD")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 7gkwGBrB_PtEn
+    Token -->|owns| Fn43Rsod_QAXD
 ```
 
 **CreateRecurringDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateRecurringDelegation ────────────────
 Transaction  signers=[alice]
-└── subscriptions::CreateRecurringDelegation [1] ✓ 5073cu  signer=alice
+└── subscriptions::CreateRecurringDelegation [1] ✓ 3573cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
-Compute Units (this run): 5073
+Compute Units (this run): 3573
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateRecurringDelegation: sequence diagram**
@@ -107,7 +113,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     participant System
-    alice ->> subscriptions: CreateRecurringDelegation (5073cu)
+    alice ->> subscriptions: CreateRecurringDelegation (3573cu)
     subscriptions ->> System: CreateAccount
 ```
 
@@ -122,7 +128,7 @@ sequenceDiagram
     alice ->>+ subscriptions: CreateRecurringDelegation
     subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions -->>- alice: ok (5073cu)
+    subscriptions -->>- alice: ok (3573cu)
 ```
 
 **CreateRecurringDelegation: authority graph**
@@ -135,9 +141,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    RecurringDelegation[(RecurringDelegation)]:::writable
+    RecurringDelegation([RecurringDelegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    RecurringDelegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| RecurringDelegation
 ```
@@ -166,8 +174,9 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[bob]
-└── subscriptions::TransferRecurring [1] ✓ 8664cu  signer=bob
+└── subscriptions::TransferRecurring [1] ✓ 5664cu  signer=bob
     ├── Token::TransferChecked [2] ✓ 113cu
     └── subscriptions::EmitEvent [2] ✓ 137cu
           🔔 RecurringTransfer
@@ -175,11 +184,11 @@ Transaction  signers=[bob]
                amount:           30000000,
                pulled_in_period: 30000000,
                receiver:         bob
-Compute Units (this run): 8664
+Compute Units (this run): 5664
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 **TransferRecurring (within window): sequence diagram**
@@ -190,7 +199,7 @@ sequenceDiagram
     participant bob
     participant subscriptions
     participant Token
-    bob ->> subscriptions: TransferRecurring (8664cu)
+    bob ->> subscriptions: TransferRecurring (5664cu)
     subscriptions ->> Token: TransferChecked (113cu)
     subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
@@ -208,7 +217,7 @@ sequenceDiagram
     Token -->>- subscriptions: ok (113cu)
     subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
-    subscriptions -->>- bob: ok (8664cu)
+    subscriptions -->>- bob: ok (5664cu)
 ```
 
 **TransferRecurring (within window): authority graph**
@@ -220,16 +229,21 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     RecurringDelegation[(RecurringDelegation)]:::writable
-    SubAuthority[(SubAuthority)]:::writable
-    7gkwGBrB_PtEn[("7gkwGBrB…PtEn")]:::writable
-    3rkSQ1n9_qF4A[("3rkSQ1n9…qF4A")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    Fn43Rsod_QAXD[("Fn43Rsod…QAXD")]:::writable
+    8w6QNgG9_CrdJ[("8w6QNgG9…CrdJ")]:::writable
     bob([bob]):::signer
     Token[Token]:::program
+    EventAuthority([EventAuthority]):::signer
     bob -->|signs| subscriptions
+    SubAuthority -->|signs| Token
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| RecurringDelegation
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 7gkwGBrB_PtEn
-    subscriptions -->|writes| 3rkSQ1n9_qF4A
+    subscriptions -->|writes| Fn43Rsod_QAXD
+    subscriptions -->|writes| 8w6QNgG9_CrdJ
+    Token -->|writes| Fn43Rsod_QAXD
+    Token -->|writes| 8w6QNgG9_CrdJ
 ```
 
 **TransferRecurring (within window): ownership graph**
@@ -242,14 +256,14 @@ flowchart LR
     RecurringDelegation[(RecurringDelegation)]:::account
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    7gkwGBrB_PtEn[("7gkwGBrB…PtEn")]:::account
-    3rkSQ1n9_qF4A[("3rkSQ1n9…qF4A")]:::account
+    Fn43Rsod_QAXD[("Fn43Rsod…QAXD")]:::account
+    8w6QNgG9_CrdJ[("8w6QNgG9…CrdJ")]:::account
     System[System]:::owner
     bob[(bob)]:::account
     subscriptions -->|owns| RecurringDelegation
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 7gkwGBrB_PtEn
-    Token -->|owns| 3rkSQ1n9_qF4A
+    Token -->|owns| Fn43Rsod_QAXD
+    Token -->|owns| 8w6QNgG9_CrdJ
     System -->|owns| bob
 ```
 
@@ -261,15 +275,16 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✗ 911cu  signer=bob
-    └── Error: DelegationExpired
+    └── Error: DelegationExpired (0x80)
 Error: InstructionError(0, Custom(128))
 Compute Units (this run): 911
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 - [x] Bob's balance is unchanged: `30000000`

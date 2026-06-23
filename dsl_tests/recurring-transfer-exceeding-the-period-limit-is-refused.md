@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 7742
+Compute Units (this run): 6242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (6242cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (7742cu)
+    subscriptions -->>- alice: ok (6242cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    En7wnLCU_YxAC[("En7wnLCU…YxAC")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    4Qy9Jqze_KRqj[("4Qy9Jqze…KRqj")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| En7wnLCU_YxAC
+    subscriptions -->|writes| 4Qy9Jqze_KRqj
+    Token -->|writes| 4Qy9Jqze_KRqj
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    En7wnLCU_YxAC[("En7wnLCU…YxAC")]:::account
+    4Qy9Jqze_KRqj[("4Qy9Jqze…KRqj")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| En7wnLCU_YxAC
+    Token -->|owns| 4Qy9Jqze_KRqj
 ```
 
 **CreateRecurringDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateRecurringDelegation ────────────────
 Transaction  signers=[alice]
 └── subscriptions::CreateRecurringDelegation [1] ✓ 6573cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 6573
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateRecurringDelegation: sequence diagram**
@@ -135,9 +141,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    RecurringDelegation[(RecurringDelegation)]:::writable
+    RecurringDelegation([RecurringDelegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    RecurringDelegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| RecurringDelegation
 ```
@@ -164,15 +172,16 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✗ 1028cu  signer=bob
-    └── Error: AmountExceedsPeriodLimit
+    └── Error: AmountExceedsPeriodLimit (0x190)
 Error: InstructionError(0, Custom(400))
 Compute Units (this run): 1028
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 - [x] Bob's ATA is still empty: `0`

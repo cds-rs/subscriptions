@@ -8,14 +8,15 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✗ 5054cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✗ 8054cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
-    └── Error: InvalidAssociatedTokenAccountDerivedAddress
+    └── Error: InvalidAssociatedTokenAccountDerivedAddress (0x6c)
 Error: InstructionError(0, Custom(108))
-Compute Units (this run): 5054
+Compute Units (this run): 8054
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```

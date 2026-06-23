@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 9242
+Compute Units (this run): 6242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (9242cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (6242cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (9242cu)
+    subscriptions -->>- alice: ok (6242cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    7q6eyGNt_m8DV[("7q6eyGNt…m8DV")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    5RfGmVJZ_C3Tn[("5RfGmVJZ…C3Tn")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 7q6eyGNt_m8DV
+    subscriptions -->|writes| 5RfGmVJZ_C3Tn
+    Token -->|writes| 5RfGmVJZ_C3Tn
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    7q6eyGNt_m8DV[("7q6eyGNt…m8DV")]:::account
+    5RfGmVJZ_C3Tn[("5RfGmVJZ…C3Tn")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 7q6eyGNt_m8DV
+    Token -->|owns| 5RfGmVJZ_C3Tn
 ```
 
 **CreatePlan: structured CPI tree**
 
 ```text
 
+── subscriptions::CreatePlan ───────────────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **CreatePlan: sequence diagram**
@@ -134,9 +140,11 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     merchant([merchant]):::signer
-    Plan[(Plan)]:::writable
+    Plan([Plan]):::signer
     System[System]:::program
     merchant -->|signs| subscriptions
+    merchant -->|signs| System
+    Plan -->|signs| System
     subscriptions -->|writes| Plan
 ```
 
@@ -158,13 +166,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferSubscription ─────────────────────
 Transaction  signers=[sponsor]
 └── subscriptions::TransferSubscription [1] ✗ 449cu
-    └── Error: NotSigner
+    └── Error: NotSigner (0x64)
 Error: InstructionError(0, Custom(100))
 Compute Units (this run): 449
 Fee: 5000 lamports
 Legend (2):
-  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
 ```

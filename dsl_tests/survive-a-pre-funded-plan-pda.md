@@ -8,16 +8,17 @@
 
 ```text
 
+── subscriptions::CreatePlan ───────────────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 5726cu  signer=merchant
-    ├── System::Transfer [2] ✓ (no cu)
+    ├── System::Transfer (merchant -> Plan) 4,307,240 lamports [2] ✓ (no cu)
     ├── System::Allocate [2] ✓ (no cu)
     └── System::Assign [2] ✓ (no cu)
 Compute Units (this run): 5726
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **CreatePlan (pre-funded PDA): sequence diagram**
@@ -29,7 +30,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->> subscriptions: CreatePlan (5726cu)
-    subscriptions ->> System: Transfer
+    subscriptions ->> System: Transfer (merchant → Plan) 4,307,240 lamports
     subscriptions ->> System: Allocate
     subscriptions ->> System: Assign
 ```
@@ -43,7 +44,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     merchant ->>+ subscriptions: CreatePlan
-    subscriptions ->>+ System: Transfer
+    subscriptions ->>+ System: Transfer (merchant → Plan) 4,307,240 lamports
     System -->>- subscriptions: ok
     subscriptions ->>+ System: Allocate
     System -->>- subscriptions: ok
@@ -61,10 +62,13 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     merchant([merchant]):::signer
-    Plan[(Plan)]:::writable
+    Plan([Plan]):::signer
     System[System]:::program
     merchant -->|signs| subscriptions
+    merchant -->|signs| System
+    Plan -->|signs| System
     subscriptions -->|writes| Plan
+    System -->|writes| Plan
 ```
 
 **CreatePlan (pre-funded PDA): ownership graph**

@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    6WzVuHNZ_gf7X[("6WzVuHNZ…gf7X")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    En7wnLCU_YxAC[("En7wnLCU…YxAC")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 6WzVuHNZ_gf7X
+    subscriptions -->|writes| En7wnLCU_YxAC
+    Token -->|writes| En7wnLCU_YxAC
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    6WzVuHNZ_gf7X[("6WzVuHNZ…gf7X")]:::account
+    En7wnLCU_YxAC[("En7wnLCU…YxAC")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 6WzVuHNZ_gf7X
+    Token -->|owns| En7wnLCU_YxAC
 ```
 
 **CreateFixedDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateFixedDelegation ────────────────────
 Transaction  signers=[alice]
-└── subscriptions::CreateFixedDelegation [1] ✓ 3538cu  signer=alice
+└── subscriptions::CreateFixedDelegation [1] ✓ 5038cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
-Compute Units (this run): 3538
+Compute Units (this run): 5038
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateFixedDelegation: sequence diagram**
@@ -107,7 +113,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     participant System
-    alice ->> subscriptions: CreateFixedDelegation (3538cu)
+    alice ->> subscriptions: CreateFixedDelegation (5038cu)
     subscriptions ->> System: CreateAccount
 ```
 
@@ -122,7 +128,7 @@ sequenceDiagram
     alice ->>+ subscriptions: CreateFixedDelegation
     subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions -->>- alice: ok (3538cu)
+    subscriptions -->>- alice: ok (5038cu)
 ```
 
 **CreateFixedDelegation: authority graph**
@@ -135,9 +141,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    FixedDelegation[(FixedDelegation)]:::writable
+    FixedDelegation([FixedDelegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    FixedDelegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| FixedDelegation
 ```
@@ -164,13 +172,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferFixed ────────────────────────────
 Transaction  signers=[mallory]
 └── subscriptions::TransferFixed [1] ✗ 682cu  signer=mallory
-    └── Error: Unauthorized
+    └── Error: Unauthorized (0x82)
 Error: InstructionError(0, Custom(130))
 Compute Units (this run): 682
 Fee: 5000 lamports
 Legend (2):
-  mallory       = DBSEUVB8mVMJYsFGED5gtoBUxDPN2FmQKs9KPiMxXoE8
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  mallory       = DBSEUVB8mVMJYsFGED5gtoBUxDPN2FmQKs9KPiMxXoE8
 ```

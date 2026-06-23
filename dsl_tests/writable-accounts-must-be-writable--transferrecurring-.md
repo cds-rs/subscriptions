@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 9242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    DbGYPej8_yNJn[("DbGYPej8…yNJn")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    HPgKxpcd_eH9V[("HPgKxpcd…eH9V")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| DbGYPej8_yNJn
+    subscriptions -->|writes| HPgKxpcd_eH9V
+    Token -->|writes| HPgKxpcd_eH9V
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    DbGYPej8_yNJn[("DbGYPej8…yNJn")]:::account
+    HPgKxpcd_eH9V[("HPgKxpcd…eH9V")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| DbGYPej8_yNJn
+    Token -->|owns| HPgKxpcd_eH9V
 ```
 
 **CreateRecurringDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateRecurringDelegation ────────────────
 Transaction  signers=[alice]
-└── subscriptions::CreateRecurringDelegation [1] ✓ 8073cu  signer=alice
+└── subscriptions::CreateRecurringDelegation [1] ✓ 6573cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
-Compute Units (this run): 8073
+Compute Units (this run): 6573
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateRecurringDelegation: sequence diagram**
@@ -107,7 +113,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     participant System
-    alice ->> subscriptions: CreateRecurringDelegation (8073cu)
+    alice ->> subscriptions: CreateRecurringDelegation (6573cu)
     subscriptions ->> System: CreateAccount
 ```
 
@@ -122,7 +128,7 @@ sequenceDiagram
     alice ->>+ subscriptions: CreateRecurringDelegation
     subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions -->>- alice: ok (8073cu)
+    subscriptions -->>- alice: ok (6573cu)
 ```
 
 **CreateRecurringDelegation: authority graph**
@@ -135,9 +141,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    RecurringDelegation[(RecurringDelegation)]:::writable
+    RecurringDelegation([RecurringDelegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    RecurringDelegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| RecurringDelegation
 ```
@@ -162,46 +170,49 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[sponsor, bob]
 └── subscriptions::TransferRecurring [1] ✗ 343cu  signer=bob
-    └── Error: AccountNotWritable
+    └── Error: AccountNotWritable (0x83)
 Error: InstructionError(0, Custom(131))
 Compute Units (this run): 343
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```
 
 **TransferRecurring (delegatorAta forced read-only): structured CPI tree**
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[sponsor, bob]
 └── subscriptions::TransferRecurring [1] ✗ 346cu  signer=bob
-    └── Error: AccountNotWritable
+    └── Error: AccountNotWritable (0x83)
 Error: InstructionError(0, Custom(131))
 Compute Units (this run): 346
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```
 
 **TransferRecurring (receiverAta forced read-only): structured CPI tree**
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[sponsor, bob]
 └── subscriptions::TransferRecurring [1] ✗ 349cu  signer=bob
-    └── Error: AccountNotWritable
+    └── Error: AccountNotWritable (0x83)
 Error: InstructionError(0, Custom(131))
 Compute Units (this run): 349
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```

@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::Approve ──────────────────────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 8854cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 8854
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    Ens4LR9N_KDG5[("Ens4LR9N…KDG5")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    EzVN65iL_o6PP[("EzVN65iL…o6PP")]:::writable
     System[System]:::program
     Token_2022["Token-2022"]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token_2022
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| Ens4LR9N_KDG5
+    subscriptions -->|writes| EzVN65iL_o6PP
+    Token_2022 -->|writes| EzVN65iL_o6PP
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,8 +84,8 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token_2022["Token-2022"]:::owner
-    Ens4LR9N_KDG5[("Ens4LR9N…KDG5")]:::account
+    EzVN65iL_o6PP[("EzVN65iL…o6PP")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token_2022 -->|owns| Ens4LR9N_KDG5
+    Token_2022 -->|owns| EzVN65iL_o6PP
 ```

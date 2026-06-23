@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 9242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    5CwbSCxq_bKYU[("5CwbSCxq…bKYU")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    2Fn3NiRA_bZJM[("2Fn3NiRA…bZJM")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 5CwbSCxq_bKYU
+    subscriptions -->|writes| 2Fn3NiRA_bZJM
+    Token -->|writes| 2Fn3NiRA_bZJM
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    5CwbSCxq_bKYU[("5CwbSCxq…bKYU")]:::account
+    2Fn3NiRA_bZJM[("2Fn3NiRA…bZJM")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 5CwbSCxq_bKYU
+    Token -->|owns| 2Fn3NiRA_bZJM
 ```
 
 **CreatePlan: structured CPI tree**
 
 ```text
 
+── subscriptions::CreatePlan ───────────────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **CreatePlan: sequence diagram**
@@ -134,9 +140,11 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     merchant([merchant]):::signer
-    Plan[(Plan)]:::writable
+    Plan([Plan]):::signer
     System[System]:::program
     merchant -->|signs| subscriptions
+    merchant -->|signs| System
+    Plan -->|signs| System
     subscriptions -->|writes| Plan
 ```
 
@@ -160,14 +168,15 @@ flowchart LR
 
 ```text
 
+── subscriptions::CancelSubscription ───────────────────────
 Transaction  signers=[alice]
 └── subscriptions::CancelSubscription [1] ✓ 1931cu  signer=alice
     └── subscriptions::EmitEvent [2] ✓ 137cu
 Compute Units (this run): 1931
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CancelSubscription: sequence diagram**
@@ -204,7 +213,9 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     Subscription[(Subscription)]:::writable
+    EventAuthority([EventAuthority]):::signer
     alice -->|signs| subscriptions
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| Subscription
 ```
 
@@ -228,15 +239,16 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferSubscription ─────────────────────
 Transaction  signers=[merchant]
-└── subscriptions::TransferSubscription [1] ✓ 7445cu  signer=merchant
+└── subscriptions::TransferSubscription [1] ✓ 5945cu  signer=merchant
     ├── Token::TransferChecked [2] ✓ 113cu
     └── subscriptions::EmitEvent [2] ✓ 137cu
-Compute Units (this run): 7445
+Compute Units (this run): 5945
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **TransferSubscription (current period): sequence diagram**
@@ -247,7 +259,7 @@ sequenceDiagram
     participant merchant
     participant subscriptions
     participant Token
-    merchant ->> subscriptions: TransferSubscription (7445cu)
+    merchant ->> subscriptions: TransferSubscription (5945cu)
     subscriptions ->> Token: TransferChecked (113cu)
     subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
@@ -265,7 +277,7 @@ sequenceDiagram
     Token -->>- subscriptions: ok (113cu)
     subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
-    subscriptions -->>- merchant: ok (7445cu)
+    subscriptions -->>- merchant: ok (5945cu)
 ```
 
 **TransferSubscription (current period): authority graph**
@@ -277,14 +289,20 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     Subscription[(Subscription)]:::writable
-    5CwbSCxq_bKYU[("5CwbSCxq…bKYU")]:::writable
-    BGHuFojA_n47T[("BGHuFojA…n47T")]:::writable
+    2Fn3NiRA_bZJM[("2Fn3NiRA…bZJM")]:::writable
+    FUARhrBv_WKF9[("FUARhrBv…WKF9")]:::writable
     merchant([merchant]):::signer
     Token[Token]:::program
+    SubAuthority([SubAuthority]):::signer
+    EventAuthority([EventAuthority]):::signer
     merchant -->|signs| subscriptions
+    SubAuthority -->|signs| Token
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| Subscription
-    subscriptions -->|writes| 5CwbSCxq_bKYU
-    subscriptions -->|writes| BGHuFojA_n47T
+    subscriptions -->|writes| 2Fn3NiRA_bZJM
+    subscriptions -->|writes| FUARhrBv_WKF9
+    Token -->|writes| 2Fn3NiRA_bZJM
+    Token -->|writes| FUARhrBv_WKF9
 ```
 
 **TransferSubscription (current period): ownership graph**
@@ -296,13 +314,13 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     Subscription[(Subscription)]:::account
     Token[Token]:::owner
-    5CwbSCxq_bKYU[("5CwbSCxq…bKYU")]:::account
-    BGHuFojA_n47T[("BGHuFojA…n47T")]:::account
+    2Fn3NiRA_bZJM[("2Fn3NiRA…bZJM")]:::account
+    FUARhrBv_WKF9[("FUARhrBv…WKF9")]:::account
     System[System]:::owner
     merchant[(merchant)]:::account
     subscriptions -->|owns| Subscription
-    Token -->|owns| 5CwbSCxq_bKYU
-    Token -->|owns| BGHuFojA_n47T
+    Token -->|owns| 2Fn3NiRA_bZJM
+    Token -->|owns| FUARhrBv_WKF9
     System -->|owns| merchant
 ```
 

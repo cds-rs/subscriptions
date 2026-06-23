@@ -6,6 +6,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -13,8 +14,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -57,13 +58,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    ChChrDga_DdgJ[("ChChrDga…DdgJ")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    B3WsURS9_zUDn[("B3WsURS9…zUDn")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| ChChrDga_DdgJ
+    subscriptions -->|writes| B3WsURS9_zUDn
+    Token -->|writes| B3WsURS9_zUDn
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -77,24 +82,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    ChChrDga_DdgJ[("ChChrDga…DdgJ")]:::account
+    B3WsURS9_zUDn[("B3WsURS9…zUDn")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| ChChrDga_DdgJ
+    Token -->|owns| B3WsURS9_zUDn
 ```
 
 **CreateFixedDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateFixedDelegation ────────────────────
 Transaction  signers=[alice]
-└── subscriptions::CreateFixedDelegation [1] ✓ 5038cu  signer=alice
+└── subscriptions::CreateFixedDelegation [1] ✓ 6538cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
-Compute Units (this run): 5038
+Compute Units (this run): 6538
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateFixedDelegation: sequence diagram**
@@ -105,7 +111,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     participant System
-    alice ->> subscriptions: CreateFixedDelegation (5038cu)
+    alice ->> subscriptions: CreateFixedDelegation (6538cu)
     subscriptions ->> System: CreateAccount
 ```
 
@@ -120,7 +126,7 @@ sequenceDiagram
     alice ->>+ subscriptions: CreateFixedDelegation
     subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions -->>- alice: ok (5038cu)
+    subscriptions -->>- alice: ok (6538cu)
 ```
 
 **CreateFixedDelegation: authority graph**
@@ -133,9 +139,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    Delegation[(Delegation)]:::writable
+    Delegation([Delegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    Delegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| Delegation
 ```
@@ -160,30 +168,32 @@ flowchart LR
 
 ```text
 
+── subscriptions::RevokeDelegation ─────────────────────────
 Transaction  signers=[sponsor, alice]
 └── subscriptions::RevokeDelegation [1] ✗ 161cu  signer=alice
-    └── Error: AccountNotWritable
+    └── Error: AccountNotWritable (0x83)
 Error: InstructionError(0, Custom(131))
 Compute Units (this run): 161
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```
 
 **RevokeDelegation (delegationAccount forced read-only): structured CPI tree**
 
 ```text
 
+── subscriptions::RevokeDelegation ─────────────────────────
 Transaction  signers=[sponsor, alice]
 └── subscriptions::RevokeDelegation [1] ✗ 164cu  signer=alice
-    └── Error: AccountNotWritable
+    └── Error: AccountNotWritable (0x83)
 Error: InstructionError(0, Custom(131))
 Compute Units (this run): 164
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```

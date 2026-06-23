@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::Approve ──────────────────────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 10387cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 13387cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token-2022::Approve [2] ✓ 1035cu
-Compute Units (this run): 10387
+Compute Units (this run): 13387
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token_2022 as "Token-2022"
-    alice ->> subscriptions: InitSubscriptionAuthority (10387cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (13387cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token_2022: Approve (1035cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token_2022: Approve
     Token_2022 -->>- subscriptions: ok (1035cu)
-    subscriptions -->>- alice: ok (10387cu)
+    subscriptions -->>- alice: ok (13387cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    Em8mxY9f_VtMU[("Em8mxY9f…VtMU")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    bzdaM76B_yxwh[("bzdaM76B…yxwh")]:::writable
     System[System]:::program
     Token_2022["Token-2022"]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token_2022
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| Em8mxY9f_VtMU
+    subscriptions -->|writes| bzdaM76B_yxwh
+    Token_2022 -->|writes| bzdaM76B_yxwh
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,8 +84,8 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token_2022["Token-2022"]:::owner
-    Em8mxY9f_VtMU[("Em8mxY9f…VtMU")]:::account
+    bzdaM76B_yxwh[("bzdaM76B…yxwh")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token_2022 -->|owns| Em8mxY9f_VtMU
+    Token_2022 -->|owns| bzdaM76B_yxwh
 ```

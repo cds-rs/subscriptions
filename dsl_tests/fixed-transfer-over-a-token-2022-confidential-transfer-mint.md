@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::Approve ──────────────────────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 13387cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 7387cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token-2022::Approve [2] ✓ 1035cu
-Compute Units (this run): 13387
+Compute Units (this run): 7387
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token_2022 as "Token-2022"
-    alice ->> subscriptions: InitSubscriptionAuthority (13387cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (7387cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token_2022: Approve (1035cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token_2022: Approve
     Token_2022 -->>- subscriptions: ok (1035cu)
-    subscriptions -->>- alice: ok (13387cu)
+    subscriptions -->>- alice: ok (7387cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    96VFKfFS_MPRp[("96VFKfFS…MPRp")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    EwAMhGow_HGtM[("EwAMhGow…HGtM")]:::writable
     System[System]:::program
     Token_2022["Token-2022"]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token_2022
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 96VFKfFS_MPRp
+    subscriptions -->|writes| EwAMhGow_HGtM
+    Token_2022 -->|writes| EwAMhGow_HGtM
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token_2022["Token-2022"]:::owner
-    96VFKfFS_MPRp[("96VFKfFS…MPRp")]:::account
+    EwAMhGow_HGtM[("EwAMhGow…HGtM")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token_2022 -->|owns| 96VFKfFS_MPRp
+    Token_2022 -->|owns| EwAMhGow_HGtM
 ```
 
 **CreateFixedDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateFixedDelegation ────────────────────
 Transaction  signers=[alice]
 └── subscriptions::CreateFixedDelegation [1] ✓ 3538cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3538
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateFixedDelegation: sequence diagram**
@@ -135,9 +141,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    FixedDelegation[(FixedDelegation)]:::writable
+    FixedDelegation([FixedDelegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    FixedDelegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| FixedDelegation
 ```
@@ -164,15 +172,16 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferChecked ──────────────────────────
 Transaction  signers=[bob]
-└── subscriptions::TransferFixed [1] ✓ 13662cu  signer=bob
+└── subscriptions::TransferFixed [1] ✓ 7662cu  signer=bob
     ├── Token-2022::TransferChecked [2] ✓ 2058cu
     └── subscriptions::EmitEvent [2] ✓ 137cu
-Compute Units (this run): 13662
+Compute Units (this run): 7662
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 **TransferFixed: sequence diagram**
@@ -183,7 +192,7 @@ sequenceDiagram
     participant bob
     participant subscriptions
     participant Token_2022 as "Token-2022"
-    bob ->> subscriptions: TransferFixed (13662cu)
+    bob ->> subscriptions: TransferFixed (7662cu)
     subscriptions ->> Token_2022: TransferChecked (2058cu)
     subscriptions ->> subscriptions: EmitEvent (137cu)
 ```
@@ -201,7 +210,7 @@ sequenceDiagram
     Token_2022 -->>- subscriptions: ok (2058cu)
     subscriptions ->>+ subscriptions: EmitEvent
     subscriptions -->>- subscriptions: ok (137cu)
-    subscriptions -->>- bob: ok (13662cu)
+    subscriptions -->>- bob: ok (7662cu)
 ```
 
 **TransferFixed: authority graph**
@@ -213,16 +222,21 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     FixedDelegation[(FixedDelegation)]:::writable
-    SubAuthority[(SubAuthority)]:::writable
-    96VFKfFS_MPRp[("96VFKfFS…MPRp")]:::writable
-    6z7ZNHzB_rkbu[("6z7ZNHzB…rkbu")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    EwAMhGow_HGtM[("EwAMhGow…HGtM")]:::writable
+    74DL1o2D_BeRs[("74DL1o2D…BeRs")]:::writable
     bob([bob]):::signer
     Token_2022["Token-2022"]:::program
+    EventAuthority([EventAuthority]):::signer
     bob -->|signs| subscriptions
+    SubAuthority -->|signs| Token_2022
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| FixedDelegation
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 96VFKfFS_MPRp
-    subscriptions -->|writes| 6z7ZNHzB_rkbu
+    subscriptions -->|writes| EwAMhGow_HGtM
+    subscriptions -->|writes| 74DL1o2D_BeRs
+    Token_2022 -->|writes| EwAMhGow_HGtM
+    Token_2022 -->|writes| 74DL1o2D_BeRs
 ```
 
 **TransferFixed: ownership graph**
@@ -235,14 +249,14 @@ flowchart LR
     FixedDelegation[(FixedDelegation)]:::account
     SubAuthority[(SubAuthority)]:::account
     Token_2022["Token-2022"]:::owner
-    96VFKfFS_MPRp[("96VFKfFS…MPRp")]:::account
-    6z7ZNHzB_rkbu[("6z7ZNHzB…rkbu")]:::account
+    EwAMhGow_HGtM[("EwAMhGow…HGtM")]:::account
+    74DL1o2D_BeRs[("74DL1o2D…BeRs")]:::account
     System[System]:::owner
     bob[(bob)]:::account
     subscriptions -->|owns| FixedDelegation
     subscriptions -->|owns| SubAuthority
-    Token_2022 -->|owns| 96VFKfFS_MPRp
-    Token_2022 -->|owns| 6z7ZNHzB_rkbu
+    Token_2022 -->|owns| EwAMhGow_HGtM
+    Token_2022 -->|owns| 74DL1o2D_BeRs
     System -->|owns| bob
 ```
 

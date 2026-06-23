@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    BjJ2L65Z_ASzR[("BjJ2L65Z…ASzR")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    FMX3RkoJ_QV8F[("FMX3RkoJ…QV8F")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| BjJ2L65Z_ASzR
+    subscriptions -->|writes| FMX3RkoJ_QV8F
+    Token -->|writes| FMX3RkoJ_QV8F
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    BjJ2L65Z_ASzR[("BjJ2L65Z…ASzR")]:::account
+    FMX3RkoJ_QV8F[("FMX3RkoJ…QV8F")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| BjJ2L65Z_ASzR
+    Token -->|owns| FMX3RkoJ_QV8F
 ```
 
 **CreatePlan: structured CPI tree**
 
 ```text
 
+── subscriptions::CreatePlan ───────────────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::CreatePlan [1] ✓ 3468cu  signer=merchant
     └── System::CreateAccount [2] ✓ (no cu)
 Compute Units (this run): 3468
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **CreatePlan: sequence diagram**
@@ -134,9 +140,11 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     merchant([merchant]):::signer
-    Plan[(Plan)]:::writable
+    Plan([Plan]):::signer
     System[System]:::program
     merchant -->|signs| subscriptions
+    merchant -->|signs| System
+    Plan -->|signs| System
     subscriptions -->|writes| Plan
 ```
 
@@ -158,6 +166,7 @@ flowchart LR
 
 ```text
 
+── subscriptions::Subscribe ────────────────────────────────
 Transaction  signers=[sponsor, alice]
 └── subscriptions::Subscribe [1] ✓ 6540cu  signer=[alice, sponsor]
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -170,9 +179,9 @@ Transaction  signers=[sponsor, alice]
 Compute Units (this run): 6540
 Fee: 10000 lamports
 Legend (3):
+  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
   sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
-  subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
 ```
 
 **Subscribe (sponsored): sequence diagram**
@@ -213,11 +222,15 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    Subscription[(Subscription)]:::writable
+    Subscription([Subscription]):::signer
     sponsor([sponsor]):::signer
     System[System]:::program
+    EventAuthority([EventAuthority]):::signer
     alice -->|signs| subscriptions
     sponsor -->|signs| subscriptions
+    sponsor -->|signs| System
+    Subscription -->|signs| System
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| Subscription
 ```
 
@@ -243,13 +256,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::UpdatePlan ───────────────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::UpdatePlan [1] ✓ 500cu  signer=merchant
 Compute Units (this run): 500
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **UpdatePlan (sunset): sequence diagram**
@@ -307,13 +321,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::DeletePlan ───────────────────────────────
 Transaction  signers=[merchant]
 └── subscriptions::DeletePlan [1] ✓ 366cu  signer=merchant
 Compute Units (this run): 366
 Fee: 5000 lamports
 Legend (2):
-  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  merchant      = J4fPsxKiTTKiXSiN9bgZ5JBrVgTM9c6N8tjhLN8gfdTq
 ```
 
 **DeletePlan: sequence diagram**
@@ -359,7 +374,9 @@ flowchart LR
     classDef account fill:#fff3cd,stroke:#ffc107;
     System[System]:::owner
     merchant[(merchant)]:::account
+    Plan[(Plan)]:::account
     System -->|owns| merchant
+    System -->|owns| Plan
 ```
 
 ### The sponsor revokes against the closed plan
@@ -368,13 +385,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::RevokeDelegation ─────────────────────────
 Transaction  signers=[sponsor]
 └── subscriptions::RevokeDelegation [1] ✓ 460cu  signer=sponsor
 Compute Units (this run): 460
 Fee: 5000 lamports
 Legend (2):
-  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  sponsor       = 47cncVPgU4mK37H7VvxLCCsoDEKYaVhNLHHp4MbnEwvx
 ```
 
 **RevokeSubscription (plan closed): sequence diagram**
@@ -420,5 +438,7 @@ flowchart LR
     classDef account fill:#fff3cd,stroke:#ffc107;
     System[System]:::owner
     sponsor[(sponsor)]:::account
+    Subscription[(Subscription)]:::account
     System -->|owns| sponsor
+    System -->|owns| Subscription
 ```

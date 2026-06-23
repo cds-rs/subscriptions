@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 6242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    28VaCvnT_TZ7w[("28VaCvnT…TZ7w")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    DPV4uucw_FVab[("DPV4uucw…FVab")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| 28VaCvnT_TZ7w
+    subscriptions -->|writes| DPV4uucw_FVab
+    Token -->|writes| DPV4uucw_FVab
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,10 +84,10 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    28VaCvnT_TZ7w[("28VaCvnT…TZ7w")]:::account
+    DPV4uucw_FVab[("DPV4uucw…FVab")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| 28VaCvnT_TZ7w
+    Token -->|owns| DPV4uucw_FVab
 ```
 
 ### Alice requests a period beyond the maximum
@@ -91,13 +96,14 @@ flowchart LR
 
 ```text
 
+── subscriptions::CreateRecurringDelegation ────────────────
 Transaction  signers=[alice]
 └── subscriptions::CreateRecurringDelegation [1] ✗ 382cu  signer=alice
-    └── Error: InvalidPeriodLength
+    └── Error: InvalidPeriodLength (0x192)
 Error: InstructionError(0, Custom(402))
 Compute Units (this run): 382
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```

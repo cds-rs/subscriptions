@@ -8,13 +8,14 @@
 
 ```text
 
+── subscriptions::CreateFixedDelegation ────────────────────
 Transaction  signers=[alice]
 └── subscriptions::CreateFixedDelegation [1] ✗ 357cu  signer=alice
-    └── Error: FixedDelegationExpiryInPast
+    └── Error: FixedDelegationExpiryInPast (0x12d)
 Error: InstructionError(0, Custom(301))
 Compute Units (this run): 357
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```

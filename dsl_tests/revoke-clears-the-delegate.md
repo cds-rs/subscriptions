@@ -8,15 +8,16 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
-└── subscriptions::InitSubscriptionAuthority [1] ✓ 9242cu  signer=alice
+└── subscriptions::InitSubscriptionAuthority [1] ✓ 7742cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
     └── Token::Approve [2] ✓ 126cu
-Compute Units (this run): 9242
+Compute Units (this run): 7742
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -28,7 +29,7 @@ sequenceDiagram
     participant subscriptions
     participant System
     participant Token
-    alice ->> subscriptions: InitSubscriptionAuthority (9242cu)
+    alice ->> subscriptions: InitSubscriptionAuthority (7742cu)
     subscriptions ->> System: CreateAccount
     subscriptions ->> Token: Approve (126cu)
 ```
@@ -47,7 +48,7 @@ sequenceDiagram
     System -->>- subscriptions: ok
     subscriptions ->>+ Token: Approve
     Token -->>- subscriptions: ok (126cu)
-    subscriptions -->>- alice: ok (9242cu)
+    subscriptions -->>- alice: ok (7742cu)
 ```
 
 **InitSubscriptionAuthority: authority graph**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    ABAbaV7S_Zdba[("ABAbaV7S…Zdba")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    8PZzCwca_i1Mi[("8PZzCwca…i1Mi")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| ABAbaV7S_Zdba
+    subscriptions -->|writes| 8PZzCwca_i1Mi
+    Token -->|writes| 8PZzCwca_i1Mi
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,10 +84,10 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    ABAbaV7S_Zdba[("ABAbaV7S…Zdba")]:::account
+    8PZzCwca_i1Mi[("8PZzCwca…i1Mi")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| ABAbaV7S_Zdba
+    Token -->|owns| 8PZzCwca_i1Mi
 ```
 
 - [x] the ATA is delegated for the full amount before revoke: `18446744073709551615`
@@ -93,14 +98,15 @@ flowchart LR
 
 ```text
 
+── subscriptions::RevokeSubscriptionAuthority ──────────────
 Transaction  signers=[alice]
-└── subscriptions::RevokeSubscriptionAuthority [1] ✓ 3097cu  signer=alice
+└── subscriptions::RevokeSubscriptionAuthority [1] ✓ 4597cu  signer=alice
     └── Token::Revoke [2] ✓ 108cu
-Compute Units (this run): 3097
+Compute Units (this run): 4597
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **RevokeSubscriptionAuthority: sequence diagram**
@@ -111,7 +117,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     participant Token
-    alice ->> subscriptions: RevokeSubscriptionAuthority (3097cu)
+    alice ->> subscriptions: RevokeSubscriptionAuthority (4597cu)
     subscriptions ->> Token: Revoke (108cu)
 ```
 
@@ -126,7 +132,7 @@ sequenceDiagram
     alice ->>+ subscriptions: RevokeSubscriptionAuthority
     subscriptions ->>+ Token: Revoke
     Token -->>- subscriptions: ok (108cu)
-    subscriptions -->>- alice: ok (3097cu)
+    subscriptions -->>- alice: ok (4597cu)
 ```
 
 **RevokeSubscriptionAuthority: authority graph**
@@ -138,10 +144,12 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    ABAbaV7S_Zdba[("ABAbaV7S…Zdba")]:::writable
+    8PZzCwca_i1Mi[("8PZzCwca…i1Mi")]:::writable
     Token[Token]:::program
     alice -->|signs| subscriptions
-    subscriptions -->|writes| ABAbaV7S_Zdba
+    alice -->|signs| Token
+    subscriptions -->|writes| 8PZzCwca_i1Mi
+    Token -->|writes| 8PZzCwca_i1Mi
 ```
 
 **RevokeSubscriptionAuthority: ownership graph**
@@ -153,9 +161,9 @@ flowchart LR
     System[System]:::owner
     alice[(alice)]:::account
     Token[Token]:::owner
-    ABAbaV7S_Zdba[("ABAbaV7S…Zdba")]:::account
+    8PZzCwca_i1Mi[("8PZzCwca…i1Mi")]:::account
     System -->|owns| alice
-    Token -->|owns| ABAbaV7S_Zdba
+    Token -->|owns| 8PZzCwca_i1Mi
 ```
 
 - [x] the delegate is cleared after revoke: `true`

@@ -8,6 +8,7 @@
 
 ```text
 
+── subscriptions::InitSubscriptionAuthority ────────────────
 Transaction  signers=[alice]
 └── subscriptions::InitSubscriptionAuthority [1] ✓ 6242cu  signer=alice
     ├── System::CreateAccount [2] ✓ (no cu)
@@ -15,8 +16,8 @@ Transaction  signers=[alice]
 Compute Units (this run): 6242
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **InitSubscriptionAuthority: sequence diagram**
@@ -59,13 +60,17 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
-    SubAuthority[(SubAuthority)]:::writable
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::writable
     System[System]:::program
     Token[Token]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    SubAuthority -->|signs| System
+    alice -->|signs| Token
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| BmmPDdNi_5BLX
+    subscriptions -->|writes| 2523FTHA_VL6N
+    Token -->|writes| 2523FTHA_VL6N
 ```
 
 **InitSubscriptionAuthority: ownership graph**
@@ -79,24 +84,25 @@ flowchart LR
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::account
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::account
     System -->|owns| alice
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| BmmPDdNi_5BLX
+    Token -->|owns| 2523FTHA_VL6N
 ```
 
 **CreateRecurringDelegation: structured CPI tree**
 
 ```text
 
+── subscriptions::CreateRecurringDelegation ────────────────
 Transaction  signers=[alice]
-└── subscriptions::CreateRecurringDelegation [1] ✓ 3573cu  signer=alice
+└── subscriptions::CreateRecurringDelegation [1] ✓ 5073cu  signer=alice
     └── System::CreateAccount [2] ✓ (no cu)
-Compute Units (this run): 3573
+Compute Units (this run): 5073
 Fee: 5000 lamports
 Legend (2):
-  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  alice         = FXddRd8CdAC8SWKT3Ataasn69R7rbTfQZcKg8ejyrUbF
 ```
 
 **CreateRecurringDelegation: sequence diagram**
@@ -107,7 +113,7 @@ sequenceDiagram
     participant alice
     participant subscriptions
     participant System
-    alice ->> subscriptions: CreateRecurringDelegation (3573cu)
+    alice ->> subscriptions: CreateRecurringDelegation (5073cu)
     subscriptions ->> System: CreateAccount
 ```
 
@@ -122,7 +128,7 @@ sequenceDiagram
     alice ->>+ subscriptions: CreateRecurringDelegation
     subscriptions ->>+ System: CreateAccount
     System -->>- subscriptions: ok
-    subscriptions -->>- alice: ok (3573cu)
+    subscriptions -->>- alice: ok (5073cu)
 ```
 
 **CreateRecurringDelegation: authority graph**
@@ -135,9 +141,11 @@ flowchart LR
     subscriptions[subscriptions]:::program
     alice([alice]):::signer
     SubAuthority[(SubAuthority)]:::writable
-    RecurringDelegation[(RecurringDelegation)]:::writable
+    RecurringDelegation([RecurringDelegation]):::signer
     System[System]:::program
     alice -->|signs| subscriptions
+    alice -->|signs| System
+    RecurringDelegation -->|signs| System
     subscriptions -->|writes| SubAuthority
     subscriptions -->|writes| RecurringDelegation
 ```
@@ -166,6 +174,7 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✓ 5664cu  signer=bob
     ├── Token::TransferChecked [2] ✓ 113cu
@@ -178,8 +187,8 @@ Transaction  signers=[bob]
 Compute Units (this run): 5664
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 **TransferRecurring (period 0): sequence diagram**
@@ -220,16 +229,21 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     RecurringDelegation[(RecurringDelegation)]:::writable
-    SubAuthority[(SubAuthority)]:::writable
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::writable
-    4CUGFr1B_rs8r[("4CUGFr1B…rs8r")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::writable
+    8iQxq8UA_nzX9[("8iQxq8UA…nzX9")]:::writable
     bob([bob]):::signer
     Token[Token]:::program
+    EventAuthority([EventAuthority]):::signer
     bob -->|signs| subscriptions
+    SubAuthority -->|signs| Token
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| RecurringDelegation
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| BmmPDdNi_5BLX
-    subscriptions -->|writes| 4CUGFr1B_rs8r
+    subscriptions -->|writes| 2523FTHA_VL6N
+    subscriptions -->|writes| 8iQxq8UA_nzX9
+    Token -->|writes| 2523FTHA_VL6N
+    Token -->|writes| 8iQxq8UA_nzX9
 ```
 
 **TransferRecurring (period 0): ownership graph**
@@ -242,14 +256,14 @@ flowchart LR
     RecurringDelegation[(RecurringDelegation)]:::account
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::account
-    4CUGFr1B_rs8r[("4CUGFr1B…rs8r")]:::account
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::account
+    8iQxq8UA_nzX9[("8iQxq8UA…nzX9")]:::account
     System[System]:::owner
     bob[(bob)]:::account
     subscriptions -->|owns| RecurringDelegation
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| BmmPDdNi_5BLX
-    Token -->|owns| 4CUGFr1B_rs8r
+    Token -->|owns| 2523FTHA_VL6N
+    Token -->|owns| 8iQxq8UA_nzX9
     System -->|owns| bob
 ```
 
@@ -261,6 +275,7 @@ flowchart LR
 
 ```text
 
+── Token::Revoke ───────────────────────────────────────────
 Transaction  signers=[alice]
 └── Token::Revoke [1] ✓ 108cu  signer=alice
 Compute Units (this run): 108
@@ -298,10 +313,10 @@ flowchart LR
     classDef program fill:#cce5ff,stroke:#007bff;
     classDef writable fill:#fff3cd,stroke:#ffc107;
     Token[Token]:::program
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::writable
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::writable
     alice([alice]):::signer
     alice -->|signs| Token
-    Token -->|writes| BmmPDdNi_5BLX
+    Token -->|writes| 2523FTHA_VL6N
 ```
 
 **Revoke: ownership graph**
@@ -311,10 +326,10 @@ flowchart LR
     classDef owner fill:#cce5ff,stroke:#007bff;
     classDef account fill:#fff3cd,stroke:#ffc107;
     Token[Token]:::owner
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::account
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::account
     System[System]:::owner
     alice[(alice)]:::account
-    Token -->|owns| BmmPDdNi_5BLX
+    Token -->|owns| 2523FTHA_VL6N
     System -->|owns| alice
 ```
 
@@ -324,6 +339,7 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✗ 4449cu  signer=bob
     ├── Token::TransferChecked [2] ✗ 227cu
@@ -333,8 +349,8 @@ Error: InstructionError(0, Custom(4))
 Compute Units (this run): 4449
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 ### Alice re-approves, but for too small an amount; the pull still fails
@@ -343,6 +359,7 @@ Legend (2):
 
 ```text
 
+── Token::Approve ──────────────────────────────────────────
 Transaction  signers=[alice]
 └── Token::Approve [1] ✓ 126cu  signer=alice
 Compute Units (this run): 126
@@ -380,11 +397,11 @@ flowchart LR
     classDef program fill:#cce5ff,stroke:#007bff;
     classDef writable fill:#fff3cd,stroke:#ffc107;
     Token[Token]:::program
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::writable
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::writable
     SubAuthority[(SubAuthority)]:::writable
     alice([alice]):::signer
     alice -->|signs| Token
-    Token -->|writes| BmmPDdNi_5BLX
+    Token -->|writes| 2523FTHA_VL6N
     Token -->|writes| SubAuthority
 ```
 
@@ -395,12 +412,12 @@ flowchart LR
     classDef owner fill:#cce5ff,stroke:#007bff;
     classDef account fill:#fff3cd,stroke:#ffc107;
     Token[Token]:::owner
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::account
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::account
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     System[System]:::owner
     alice[(alice)]:::account
-    Token -->|owns| BmmPDdNi_5BLX
+    Token -->|owns| 2523FTHA_VL6N
     subscriptions -->|owns| SubAuthority
     System -->|owns| alice
 ```
@@ -409,6 +426,7 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✗ 4465cu  signer=bob
     ├── Token::TransferChecked [2] ✗ 243cu
@@ -418,8 +436,8 @@ Error: InstructionError(0, Custom(1))
 Compute Units (this run): 4465
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 ### Alice re-approves for the max amount; the pull succeeds again
@@ -428,6 +446,7 @@ Legend (2):
 
 ```text
 
+── Token::Approve ──────────────────────────────────────────
 Transaction  signers=[alice]
 └── Token::Approve [1] ✓ 126cu  signer=alice
 Compute Units (this run): 126
@@ -465,11 +484,11 @@ flowchart LR
     classDef program fill:#cce5ff,stroke:#007bff;
     classDef writable fill:#fff3cd,stroke:#ffc107;
     Token[Token]:::program
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::writable
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::writable
     SubAuthority[(SubAuthority)]:::writable
     alice([alice]):::signer
     alice -->|signs| Token
-    Token -->|writes| BmmPDdNi_5BLX
+    Token -->|writes| 2523FTHA_VL6N
     Token -->|writes| SubAuthority
 ```
 
@@ -480,12 +499,12 @@ flowchart LR
     classDef owner fill:#cce5ff,stroke:#007bff;
     classDef account fill:#fff3cd,stroke:#ffc107;
     Token[Token]:::owner
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::account
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::account
     subscriptions[subscriptions]:::owner
     SubAuthority[(SubAuthority)]:::account
     System[System]:::owner
     alice[(alice)]:::account
-    Token -->|owns| BmmPDdNi_5BLX
+    Token -->|owns| 2523FTHA_VL6N
     subscriptions -->|owns| SubAuthority
     System -->|owns| alice
 ```
@@ -494,6 +513,7 @@ flowchart LR
 
 ```text
 
+── subscriptions::TransferRecurring ────────────────────────
 Transaction  signers=[bob]
 └── subscriptions::TransferRecurring [1] ✓ 5755cu  signer=bob
     ├── Token::TransferChecked [2] ✓ 113cu
@@ -506,8 +526,8 @@ Transaction  signers=[bob]
 Compute Units (this run): 5755
 Fee: 5000 lamports
 Legend (2):
-  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
   subscriptions = De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+  bob           = 9S8NPMnzAba71o3tr8dHDzUrfT5NesYFzP56QFpYieMR
 ```
 
 **TransferRecurring (after max approval): sequence diagram**
@@ -548,16 +568,21 @@ flowchart LR
     classDef writable fill:#fff3cd,stroke:#ffc107;
     subscriptions[subscriptions]:::program
     RecurringDelegation[(RecurringDelegation)]:::writable
-    SubAuthority[(SubAuthority)]:::writable
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::writable
-    4CUGFr1B_rs8r[("4CUGFr1B…rs8r")]:::writable
+    SubAuthority([SubAuthority]):::signer
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::writable
+    8iQxq8UA_nzX9[("8iQxq8UA…nzX9")]:::writable
     bob([bob]):::signer
     Token[Token]:::program
+    EventAuthority([EventAuthority]):::signer
     bob -->|signs| subscriptions
+    SubAuthority -->|signs| Token
+    EventAuthority -->|signs| subscriptions
     subscriptions -->|writes| RecurringDelegation
     subscriptions -->|writes| SubAuthority
-    subscriptions -->|writes| BmmPDdNi_5BLX
-    subscriptions -->|writes| 4CUGFr1B_rs8r
+    subscriptions -->|writes| 2523FTHA_VL6N
+    subscriptions -->|writes| 8iQxq8UA_nzX9
+    Token -->|writes| 2523FTHA_VL6N
+    Token -->|writes| 8iQxq8UA_nzX9
 ```
 
 **TransferRecurring (after max approval): ownership graph**
@@ -570,13 +595,13 @@ flowchart LR
     RecurringDelegation[(RecurringDelegation)]:::account
     SubAuthority[(SubAuthority)]:::account
     Token[Token]:::owner
-    BmmPDdNi_5BLX[("BmmPDdNi…5BLX")]:::account
-    4CUGFr1B_rs8r[("4CUGFr1B…rs8r")]:::account
+    2523FTHA_VL6N[("2523FTHA…VL6N")]:::account
+    8iQxq8UA_nzX9[("8iQxq8UA…nzX9")]:::account
     System[System]:::owner
     bob[(bob)]:::account
     subscriptions -->|owns| RecurringDelegation
     subscriptions -->|owns| SubAuthority
-    Token -->|owns| BmmPDdNi_5BLX
-    Token -->|owns| 4CUGFr1B_rs8r
+    Token -->|owns| 2523FTHA_VL6N
+    Token -->|owns| 8iQxq8UA_nzX9
     System -->|owns| bob
 ```
