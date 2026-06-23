@@ -10,7 +10,7 @@ use solana_instruction::{AccountMeta, Instruction};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use litesvm_utils::{LiteSvmBackend, TestSVM};
+use testsvm::TestSVM;
 
 use crate::{
     event_engine::event_authority_pda,
@@ -19,9 +19,9 @@ use crate::{
     tests::{
         constants::{PROGRAM_ID, SYSTEM_PROGRAM_ID},
         pda::{get_plan_pda, get_subscription_authority_pda, get_subscription_pda},
-        utils::{as_pubkey, 
+        utils::{as_pubkey,
             days, CloseSubscriptionAuthority, CreatePlan, ObservedResultExt, Subscribe,
-            UpdatePlan, make_backend, World,
+            UpdatePlan, World,
         },
     },
     AccountDiscriminator, SubscriptionsError,
@@ -31,8 +31,8 @@ use crate::{
 /// with her ATA and SubscriptionAuthority, plus the merchant's plan (id 1, 50
 /// tokens, the given period and end). Mirrors the file's old `setup_plan`, but
 /// every send is observed. Returns the cast and the derived plan accounts.
-fn setup_plan(
-    world: &mut World<LiteSvmBackend>,
+fn setup_plan<B: TestSVM>(
+    world: &mut World<B>,
     period_hours: u64,
     end_ts: i64,
 ) -> (
@@ -69,9 +69,8 @@ fn setup_plan(
     (alice, merchant, mint, plan_pda, plan_bump)
 }
 
-#[test]
-fn subscribe_happy_path() {
-    let mut world = World::new(make_backend(), "Subscribe (happy path)", "Alice subscribes to the merchant's active plan");
+pub fn subscribe_happy_path<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Subscribe (happy path)", "Alice subscribes to the merchant's active plan");
     let end_ts = world.now() + days(30) as i64;
     let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
@@ -100,9 +99,8 @@ fn subscribe_happy_path() {
     world.md().check("the subscription has no expiry", 0i64, expires_at);
 }
 
-#[test]
-fn subscribe_plan_sunset_rejected() {
-    let mut world = World::new(make_backend(), "Subscribe rejects a sunset plan", "subscribing to a plan in Sunset status is refused");
+pub fn subscribe_plan_sunset_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Subscribe rejects a sunset plan", "subscribing to a plan in Sunset status is refused");
     let end_ts = world.now() + days(30) as i64;
     let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
@@ -116,9 +114,8 @@ fn subscribe_plan_sunset_rejected() {
     world.send_err(&[sub_ix], &[&alice], "Subscribe (sunset)", SubscriptionsError::PlanSunset);
 }
 
-#[test]
-fn subscribe_plan_expired_rejected() {
-    let mut world = World::new(make_backend(), "Subscribe rejects an expired plan", "subscribing after the plan's end_ts is refused");
+pub fn subscribe_plan_expired_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Subscribe rejects an expired plan", "subscribing after the plan's end_ts is refused");
     let end_ts = world.now() + days(2) as i64;
     let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
@@ -130,9 +127,8 @@ fn subscribe_plan_expired_rejected() {
     world.send_err(&[sub_ix], &[&alice], "Subscribe (expired)", SubscriptionsError::PlanExpired);
 }
 
-#[test]
-fn subscribe_mint_mismatch_rejected() {
-    let mut world = World::new(make_backend(), 
+pub fn subscribe_mint_mismatch_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Subscribe rejects a mint mismatch",
         "subscribing with an authority over a different mint is refused",
     );
@@ -153,9 +149,8 @@ fn subscribe_mint_mismatch_rejected() {
     world.send_err(&[sub_ix], &[&alice], "Subscribe (mint mismatch)", SubscriptionsError::MintMismatch);
 }
 
-#[test]
-fn subscribe_non_subscriber_subscription_authority_rejected() {
-    let mut world = World::new(make_backend(), 
+pub fn subscribe_non_subscriber_subscription_authority_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Subscribe by a second user",
         "a different user with their own authority subscribes to the same plan",
     );
@@ -174,9 +169,8 @@ fn subscribe_non_subscriber_subscription_authority_rejected() {
     world.send_ok(&[sub_ix], &[&bob], "Subscribe (bob)");
 }
 
-#[test]
-fn subscribe_no_subscription_authority_rejected() {
-    let mut world = World::new(make_backend(), 
+pub fn subscribe_no_subscription_authority_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Subscribe without an authority",
         "subscribing with no SubscriptionAuthority PDA in place is refused",
     );
@@ -194,9 +188,8 @@ fn subscribe_no_subscription_authority_rejected() {
     world.send_err(&[sub_ix], &[&charlie], "Subscribe (no authority)", SubscriptionsError::InvalidSubscriptionAuthorityPda);
 }
 
-#[test]
-fn subscribe_with_sponsor() {
-    let mut world = World::new(make_backend(), "Subscribe with a sponsor", "a sponsor pays rent and fee; Alice's lamports stay untouched");
+pub fn subscribe_with_sponsor<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Subscribe with a sponsor", "a sponsor pays rent and fee; Alice's lamports stay untouched");
     let end_ts = world.now() + days(30) as i64;
     let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
     let sponsor = world.actor("sponsor");
@@ -224,9 +217,8 @@ fn subscribe_with_sponsor() {
     world.md().check("the delegator is still Alice", alice.pubkey(), as_pubkey(sub.header.delegator.to_bytes()));
 }
 
-#[test]
-fn subscribe_duplicate_rejected() {
-    let mut world = World::new(make_backend(), "Subscribe rejects a duplicate", "subscribing twice to the same plan is refused");
+pub fn subscribe_duplicate_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Subscribe rejects a duplicate", "subscribing twice to the same plan is refused");
     let end_ts = world.now() + days(30) as i64;
     let (alice, merchant, mint, plan_pda, plan_bump) = setup_plan(&mut world, 1, end_ts);
 
@@ -243,9 +235,8 @@ fn subscribe_duplicate_rejected() {
     world.send_err(&[second_ix], &[&alice], "Subscribe (duplicate)", SubscriptionsError::AlreadySubscribed);
 }
 
-#[test]
-fn subscribe_rejects_stale_subscription_authority_generation() {
-    let mut world = World::new(make_backend(), 
+pub fn subscribe_rejects_stale_subscription_authority_generation<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Subscribe rejects a stale authority generation",
         "a subscribe carrying a closed authority's init_id is refused",
     );
@@ -307,9 +298,8 @@ fn subscribe_rejects_stale_subscription_authority_generation() {
     world.send_err(&[ix], &[&alice], "Subscribe (stale authority)", SubscriptionsError::StaleSubscriptionAuthority);
 }
 
-#[test]
-fn subscribe_rejects_stale_expected_terms() {
-    let mut world = World::new(make_backend(), 
+pub fn subscribe_rejects_stale_expected_terms<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Subscribe rejects stale expected terms",
         "a subscribe carrying a stale expected_amount is refused",
     );

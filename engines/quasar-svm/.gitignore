@@ -1,0 +1,3 @@
+# The quasar binding's rendered reports (see .cargo/config.toml). Engine-specific
+# output, regenerated on every `cargo test`; not committed.
+/quasar-reports/

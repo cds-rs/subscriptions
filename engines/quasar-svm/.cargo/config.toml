@@ -1,0 +1,14 @@
+# Route this excluded workspace's reports to its own folder, not the root
+# `dsl_tests/`. The quasar binding runs the SAME scenario titles as the litesvm
+# binding, so they resolve to the same report slugs; sharing `dsl_tests/` would
+# overwrite the committed litesvm snapshots with quasar output (a different
+# engine renders a different surface). A local, ignored dir keeps the two engines
+# from fighting over the same files. `relative = true` resolves against this
+# config's directory (engines/quasar-svm/), so it holds wherever cargo runs from.
+#
+# RUST_TEST_THREADS=1 mirrors the root config: the reports are byte-reproducible
+# only under a fixed test order (process-global `Pubkey::new_unique()` props and
+# the cold/warm JIT cost otherwise churn them).
+[env]
+MD_REPORTS_DIR = { value = "quasar-reports", relative = true }
+RUST_TEST_THREADS = "1"

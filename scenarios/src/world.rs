@@ -181,6 +181,14 @@ impl<B: TestSVM> World<B> {
         &self.backend
     }
 
+    /// What the bound engine can populate. Scenario bodies gate fee-dependent
+    /// assertions on `capabilities().fees`: a signature-less engine charges no
+    /// transaction fee, so a fee-inclusive lamport delta only holds where this is
+    /// `true`. The functional outcome is asserted unconditionally.
+    pub fn capabilities(&self) -> testsvm::Capabilities {
+        self.backend.capabilities()
+    }
+
     /// The narrative report, for `md.step` / `md.note` / `md.check` steps.
     pub fn md(&mut self) -> &mut Report {
         &mut self.report

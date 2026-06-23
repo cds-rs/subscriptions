@@ -6,6 +6,9 @@ members = [
     "tests/integration-tests",
     "tests/observed",
 ]
+exclude = [
+    "engines/quasar-svm",
+]
 resolver = "2"
 
 [workspace.package]

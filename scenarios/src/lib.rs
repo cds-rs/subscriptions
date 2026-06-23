@@ -17,6 +17,7 @@ pub mod cu_tracker;
 pub mod helpers;
 pub mod idl;
 pub mod pda;
+pub mod suite;
 pub mod test_helpers;
 pub mod world;
 
@@ -33,4 +34,36 @@ pub mod tests {
         pub use crate::test_helpers::*;
         pub use crate::world::{as_pubkey, ObservedResultExt, StagedSubscription, World};
     }
+}
+
+/// Bind a set of engine-neutral scenario bodies to a concrete backend, emitting
+/// one `#[test] fn` per scenario.
+///
+/// Each scenario in [`suite`] is a `pub fn name<B: TestSVM>(backend: B)`; this
+/// macro generates the `#[test]` shim that calls it with a fresh backend from
+/// `$factory()`. An engine workspace invokes it once per instruction family:
+///
+/// ```ignore
+/// scenarios::bind_scenarios!(
+///     crate::tests::utils::make_backend;
+///     subscribe;
+///     subscribe_happy_path,
+///     subscribe_plan_sunset_rejected,
+/// );
+/// ```
+///
+/// `$factory` is any path to a `fn() -> B` (the one place a workspace names its
+/// concrete engine); `$module` is the [`suite`] submodule the names live in; the
+/// trailing list is the bare scenario fn names. The generated test name matches
+/// the scenario fn name, so a run reads the same on every engine.
+#[macro_export]
+macro_rules! bind_scenarios {
+    ($factory:path; $module:ident; $($scenario:ident),+ $(,)?) => {
+        $(
+            #[test]
+            fn $scenario() {
+                $crate::suite::$module::$scenario($factory());
+            }
+        )+
+    };
 }

@@ -1,0 +1,10 @@
+//! The engine-neutral scenario bodies, one module per instruction family.
+//!
+//! Each `pub fn name<B: TestSVM>(backend: B)` is a lifted test body: it builds a
+//! `World` over the handed backend and runs the same flow the engine workspaces
+//! bind through [`crate::bind_scenarios`]. The bodies are byte-identical to the
+//! `test_*.rs` files they were lifted from (titles, intents, asserts), save for
+//! receiving the backend as a parameter instead of naming a concrete engine, and
+//! gating fee-dependent assertions on [`crate::tests::utils::World::capabilities`].
+
+pub mod subscribe;
