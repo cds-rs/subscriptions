@@ -3187,6 +3187,12 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 name = "scenarios"
 version = "0.1.0"
 dependencies = [
+ "dtor",
+ "pinocchio",
+ "pinocchio-associated-token-account",
+ "pinocchio-system",
+ "pinocchio-token",
+ "pinocchio-token-2022",
  "serde_json",
  "solana-account",
  "solana-clock",
@@ -3198,9 +3204,12 @@ dependencies = [
  "solana-rent 3.1.0",
  "solana-signer",
  "spl-associated-token-account-interface",
+ "spl-tlv-account-resolution",
  "spl-token-2022-interface 3.0.1",
  "spl-token-interface 3.0.0",
+ "spl-transfer-hook-interface",
  "subscriptions-program",
+ "tabled",
  "testsvm",
 ]
 

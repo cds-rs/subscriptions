@@ -31,14 +31,15 @@
 //! distinction may carry meaning for the maintainers.
 
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 
-use litesvm_utils::{
-    deterministic_keypair, model, Keypair, LiteSVM, LiteSvmBackend, MarkdownBlock, Pubkey, Report, Signer, TestSVM,
-};
 use solana_instruction::{AccountMeta, Instruction};
-
+use solana_keypair::Keypair;
+use solana_pubkey::Pubkey;
+use solana_signer::Signer;
+use testsvm::actors::deterministic_keypair;
+use testsvm::report::{MarkdownBlock, Report};
+use testsvm::{model, TestSVM};
 
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
@@ -72,18 +73,6 @@ macro_rules! errors {
     ($($v:ident),* $(,)?) => {
         &[ $((SubscriptionsError::$v as u32, stringify!($v))),* ]
     };
-}
-
-/// Build the concrete litesvm backend the suite runs on: a fresh `LiteSVM` with
-/// the subscriptions program loaded from its built `.so`. This is the one place
-/// the engine is named; [`World::new`] takes whatever backend it is handed, so
-/// binding a different `TestSVM` engine later is a swap here, not in the World.
-pub fn make_backend() -> LiteSvmBackend {
-    let mut backend = LiteSvmBackend::new(LiteSVM::new());
-    let so = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/subscriptions_program.so");
-    let bytes = std::fs::read(so).unwrap();
-    backend.deploy_program(PROGRAM_ID, &bytes);
-    backend
 }
 
 /// One object holding the backend, the narrative report, and the set of

@@ -1,9 +1,9 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::vec::Vec;
 
-pub use scenarios::helpers::{days, minutes, rent_exempt_lamports};
+pub use crate::helpers::{days, minutes, rent_exempt_lamports};
 
-use litesvm_utils::{model, TestSVM};
+use testsvm::{model, TestSVM};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_keypair::Keypair;
@@ -28,9 +28,7 @@ use spl_token_2022_interface::{
 };
 
 use solana_instruction::AccountMeta;
-#[cfg(test)]
 use spl_tlv_account_resolution::{account::ExtraAccountMeta, state::ExtraAccountMetaList};
-#[cfg(test)]
 use spl_transfer_hook_interface::instruction::ExecuteInstruction;
 
 use crate::{
@@ -178,12 +176,11 @@ pub const TRANSFER_HOOK_EXAMPLE_PROGRAM_ID: Pubkey = Pubkey::new_from_array([42u
 
 pub fn load_transfer_hook_example<B: TestSVM>(backend: &mut B) {
     let so_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../transfer-hook-example/target/deploy/transfer_hook_example.so");
+        .join("../tests/transfer-hook-example/target/deploy/transfer_hook_example.so");
     let bytes = std::fs::read(so_path).unwrap();
     backend.deploy_program(TRANSFER_HOOK_EXAMPLE_PROGRAM_ID, &bytes);
 }
 
-#[cfg(test)]
 pub fn install_transfer_hook_extra_metas<B: TestSVM>(backend: &mut B, mint: Pubkey) -> (Pubkey, Pubkey) {
     let program_id = TRANSFER_HOOK_EXAMPLE_PROGRAM_ID;
     let (validation_pda, _) = Pubkey::find_program_address(&[b"extra-account-metas", mint.as_ref()], &program_id);
