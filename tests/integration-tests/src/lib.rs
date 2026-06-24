@@ -29,7 +29,7 @@ pub mod tests {
 }
 
 #[cfg(test)]
-mod audit_regression_3_1_1;
+mod audit_regression_3_1_1_bound;
 #[cfg(test)]
 mod behavior_transfer_subscription_alt;
 #[cfg(test)]
@@ -37,15 +37,15 @@ mod audit_regression_3_1_3;
 #[cfg(test)]
 mod audit_regression_ghost_plan;
 #[cfg(test)]
-mod test_cancel_subscription;
+mod test_cancel_subscription_bound;
 #[cfg(test)]
 mod test_close_subscription_authority_bound;
 #[cfg(test)]
-mod test_create_fixed_delegation;
+mod test_create_fixed_delegation_bound;
 #[cfg(test)]
 mod test_create_plan_bound;
 #[cfg(test)]
-mod test_create_recurring_delegation;
+mod test_create_recurring_delegation_bound;
 #[cfg(test)]
 mod test_delete_plan_bound;
 #[cfg(test)]
@@ -53,11 +53,11 @@ mod test_initialize_subscription_authority_bound;
 #[cfg(test)]
 mod test_resume_subscription_bound;
 #[cfg(test)]
-mod test_revoke_abandoned_delegation;
+mod test_revoke_abandoned_delegation_bound;
 #[cfg(test)]
 mod test_subscribe_bound;
 #[cfg(test)]
-mod test_revoke_delegation;
+mod test_revoke_delegation_bound;
 #[cfg(test)]
 mod test_revoke_subscription_authority_bound;
 #[cfg(test)]

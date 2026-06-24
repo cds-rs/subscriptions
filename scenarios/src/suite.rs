@@ -7,11 +7,17 @@
 //! receiving the backend as a parameter instead of naming a concrete engine, and
 //! gating fee-dependent assertions on [`crate::tests::utils::World::capabilities`].
 
+pub mod audit_regression_3_1_1;
+pub mod cancel_subscription;
 pub mod close_subscription_authority;
+pub mod create_fixed_delegation;
 pub mod create_plan;
+pub mod create_recurring_delegation;
 pub mod delete_plan;
 pub mod initialize_subscription_authority;
 pub mod resume_subscription;
+pub mod revoke_abandoned_delegation;
+pub mod revoke_delegation;
 pub mod revoke_subscription_authority;
 pub mod subscribe;
 pub mod update_plan;

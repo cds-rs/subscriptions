@@ -5,26 +5,33 @@
 //! stands up Alice's authority through the `init_authority` verb, and performs
 //! the create-delegation action through the observed `send_*`. Every send renders
 //! its surface into the test's report under `target/md-reports/`.
+//!
+//! In `create_fixed_delegation_with_sponsor` Alice revokes a sponsor-funded
+//! delegation, routing the rent to the sponsor; her only balance movement is the
+//! transaction fee, so the "Alice paid the revoke fee" check (a strict
+//! `final < after`) is gated on `world.capabilities().fees`. On a fee-less engine
+//! Alice's balance is unchanged after the revoke, which is correct, so the strict
+//! inequality would not hold there. The companion "sponsor was refunded the rent"
+//! check (a tolerance inequality) holds regardless and stays ungated.
 
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use litesvm_utils::TestSVM;
+use testsvm::TestSVM;
 
 use crate::{
     tests::{
         pda::get_delegation_pda,
-        utils::{as_pubkey, 
+        utils::{as_pubkey,
             days, token_balance, CloseSubscriptionAuthority, CreateDelegation,
-            ObservedResultExt, RevokeDelegation, TransferDelegation, make_backend, World,
+            ObservedResultExt, RevokeDelegation, TransferDelegation, World,
         },
     },
     AccountDiscriminator, FixedDelegation, SubscriptionsError,
 };
 
-#[test]
-fn create_fixed_delegation_with_sponsor() {
-    let mut world = World::new(make_backend(), 
+pub fn create_fixed_delegation_with_sponsor<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Create a fixed delegation with a sponsor",
         "a sponsor pays the delegation rent; revoking refunds it to the sponsor",
     );
@@ -84,14 +91,17 @@ fn create_fixed_delegation_with_sponsor() {
         sponsor_balance_final >= sponsor_balance_after + delegation_rent,
     );
 
-    // Check delegator paid for revoke.
-    let delegator_balance_final = world.svm().get_account(&delegator.pubkey()).unwrap().lamports;
-    world.md().check("Alice paid the revoke fee", true, delegator_balance_final < delegator_balance_after);
+    // Check delegator paid for revoke. The rent routes to the sponsor, so Alice's
+    // only balance movement here is the transaction fee; on a fee-less engine her
+    // balance is unchanged, so gate the strict drop on the fees capability.
+    if world.capabilities().fees {
+        let delegator_balance_final = world.svm().get_account(&delegator.pubkey()).unwrap().lamports;
+        world.md().check("Alice paid the revoke fee", true, delegator_balance_final < delegator_balance_after);
+    }
 }
 
-#[test]
-fn create_fixed_delegation() {
-    let mut world = World::new(make_backend(), 
+pub fn create_fixed_delegation<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Create a fixed delegation",
         "Alice grants a fixed-amount delegation to a delegatee",
     );
@@ -133,9 +143,8 @@ fn create_fixed_delegation() {
     world.md().check("the expiry matches", expiry_ts, del_expiry_s);
 }
 
-#[test]
-fn create_fixed_delegation_rejects_stale_subscription_authority_generation() {
-    let mut world = World::new(make_backend(), 
+pub fn create_fixed_delegation_rejects_stale_subscription_authority_generation<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a stale subscription-authority generation",
         "a delegation pinned to a closed authority's init_id is rejected after re-init",
     );
@@ -181,11 +190,10 @@ fn create_fixed_delegation_rejects_stale_subscription_authority_generation() {
 
 /// Verify that pre-funding a delegation PDA with lamports (DOS attack)
 /// does not prevent the legitimate user from creating the delegation.
-#[test]
-fn create_fixed_delegation_with_prefunded_pda() {
+pub fn create_fixed_delegation_with_prefunded_pda<B: TestSVM>(backend: B) {
     use solana_account::Account;
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Survive a pre-funded delegation PDA",
         "a griefer pre-funds the delegation PDA; Alice can still create it",
     );
@@ -250,9 +258,8 @@ fn create_fixed_delegation_with_prefunded_pda() {
 // NOTE: These error tests use FixedDelegation but validate shared code paths.
 // The same checks apply to RecurringDelegation via shared helpers.
 
-#[test]
-fn create_delegation_without_subscription_authority() {
-    let mut world = World::new(make_backend(), 
+pub fn create_delegation_without_subscription_authority<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a delegation without a subscription authority",
         "creating a delegation before initializing the authority is refused",
     );
@@ -271,9 +278,8 @@ fn create_delegation_without_subscription_authority() {
     assert!(!res.is_success());
 }
 
-#[test]
-fn create_delegation_wrong_pda() {
-    let mut world = World::new(make_backend(), 
+pub fn create_delegation_wrong_pda<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a delegation at the wrong PDA",
         "an instruction pointed at a non-canonical delegation PDA is refused",
     );
@@ -296,9 +302,8 @@ fn create_delegation_wrong_pda() {
     assert!(!res.is_success());
 }
 
-#[test]
-fn create_delegation_duplicate_nonce() {
-    let mut world = World::new(make_backend(), 
+pub fn create_delegation_duplicate_nonce<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a duplicate delegation nonce",
         "creating a second delegation at the same nonce is refused",
     );
@@ -325,9 +330,8 @@ fn create_delegation_duplicate_nonce() {
     world.send_err(&[ix2], &[&payer], "CreateFixedDelegation (duplicate nonce)", SubscriptionsError::DelegationAlreadyExists);
 }
 
-#[test]
-fn create_multiple_delegations_different_nonces() {
-    let mut world = World::new(make_backend(), 
+pub fn create_multiple_delegations_different_nonces<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Create multiple delegations at different nonces",
         "distinct nonces derive distinct delegation PDAs",
     );
@@ -372,8 +376,7 @@ fn create_multiple_delegations_different_nonces() {
     world.md().check("nonce 2 lands at the derived PDA", expected_pda2, pda2);
 }
 
-#[test]
-fn writable_accounts_must_be_writable() {
+pub fn writable_accounts_must_be_writable<B: TestSVM>(backend: B) {
     use solana_instruction::{AccountMeta, Instruction};
 
     use crate::{
@@ -383,7 +386,7 @@ fn writable_accounts_must_be_writable() {
 
     let writable = idl::writable_account_indices("createFixedDelegation");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Create fixed delegation: writable accounts must be writable",
         "flipping any account the instruction writes to read-only is rejected",
     );
@@ -441,8 +444,7 @@ fn writable_accounts_must_be_writable() {
     }
 }
 
-#[test]
-fn signer_accounts_must_be_signers() {
+pub fn signer_accounts_must_be_signers<B: TestSVM>(backend: B) {
     use solana_instruction::{AccountMeta, Instruction};
 
     use crate::{
@@ -452,7 +454,7 @@ fn signer_accounts_must_be_signers() {
 
     let signers = idl::signer_account_indices("createFixedDelegation");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Create fixed delegation: signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -511,9 +513,8 @@ fn signer_accounts_must_be_signers() {
     }
 }
 
-#[test]
-fn create_fixed_delegation_with_expiry_in_past() {
-    let mut world = World::new(make_backend(), 
+pub fn create_fixed_delegation_with_expiry_in_past<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a fixed delegation with a past expiry",
         "an expiry timestamp before now is refused",
     );
@@ -538,9 +539,8 @@ fn create_fixed_delegation_with_expiry_in_past() {
     world.send_err(&[ix], &[&payer], "CreateFixedDelegation (past expiry)", SubscriptionsError::FixedDelegationExpiryInPast);
 }
 
-#[test]
-fn create_fixed_delegation_with_zero_expiry() {
-    let mut world = World::new(make_backend(), 
+pub fn create_fixed_delegation_with_zero_expiry<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Create a fixed delegation with a zero expiry",
         "a zero expiry means no expiry; the delegatee can still pull later",
     );
