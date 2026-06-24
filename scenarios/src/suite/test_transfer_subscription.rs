@@ -34,7 +34,7 @@ use crate::{
 /// Stage a plan (owned by the merchant) and a live subscription for Alice,
 /// driving every on-chain action through the observed backend. Mirrors the file's
 /// original `setup_plan_and_subscription`, but takes a `&mut World` and returns
-/// owned values (minus the LiteSVM the world now owns). The subscription is
+/// owned values (minus the backend the World now owns). The subscription is
 /// injected directly with the world's clock as the period start.
 #[allow(clippy::type_complexity)]
 fn setup_plan_and_subscription<B: TestSVM>(

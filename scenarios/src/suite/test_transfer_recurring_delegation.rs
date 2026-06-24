@@ -34,7 +34,7 @@ use spl_token_interface::instruction::TokenInstruction::{Approve, Revoke};
 /// Stage a recurring delegation: Alice initializes her authority over a fresh SPL
 /// mint, funds her ATA, and creates a recurring delegation to Bob. Mirrors the
 /// suite's `setup_recurring_delegation`, but every send is observed. Returns the
-/// cast and the derived accounts (minus the LiteSVM, which the World owns).
+/// cast and the derived accounts (minus the backend, which the World owns).
 #[allow(clippy::too_many_arguments)]
 fn setup_recurring_delegation<B: TestSVM>(
     world: &mut World<B>,

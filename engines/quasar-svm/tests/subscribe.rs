@@ -9,11 +9,12 @@
 //! `.cargo/config.toml`).
 //!
 //! Fee-dependent assertions are gated inside the bodies on
-//! `world.capabilities().fees`. quasar-svm models fees, so on this engine they
-//! run; the gate exists for signature-less engines. The one balance-shaped
+//! `world.capabilities().fees`. quasar-svm is signature-less (`fees: false`), so
+//! those gates are skipped here; the gate is what lets one body run on a
+//! fee-charging engine and a signature-less one alike. The one balance-shaped
 //! assertion (`subscribe_with_sponsor`'s "the sponsor was charged") holds via the
 //! rent the sponsor pays for the Subscription PDA, independent of the fee, so it
-//! needs no gate.
+//! needs no gate and runs on every engine.
 
 use subscriptions_quasar_spike::make_quasar_backend;
 

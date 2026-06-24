@@ -35,7 +35,7 @@ use spl_token_interface::instruction::TokenInstruction::Approve;
 /// Stage a fixed delegation: Alice initializes her authority over a fresh SPL
 /// mint, funds her ATA, and creates a fixed delegation to Bob. Mirrors the
 /// suite's `setup_fixed_delegation`, but every send is observed. Returns the cast
-/// and the derived accounts (minus the LiteSVM, which the World owns).
+/// and the derived accounts (minus the backend, which the World owns).
 fn setup_fixed_delegation<B: TestSVM>(
     world: &mut World<B>,
     amount: u64,
