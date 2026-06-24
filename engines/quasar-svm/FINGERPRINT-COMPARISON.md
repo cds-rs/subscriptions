@@ -63,6 +63,13 @@ One scenario (create a fixed delegation), rendered on each engine:
 
 Diff: 40 lines.
 
+## Browse all reports
+
+Every scenario, rendered per engine (one report each, same 225 scenarios):
+
+- litesvm: [`dsl_tests/`](../../dsl_tests/README.md)
+- quasar-svm: [`quasar-reports/`](quasar-reports/README.md)
+
 ## Status
 
 It worked: the same suite, unchanged, runs green on both engines. The reports do
