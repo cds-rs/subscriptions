@@ -15,14 +15,14 @@ use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use litesvm_utils::LiteSvmBackend;
+use testsvm::TestSVM;
 use crate::{
     state::common::PlanStatus,
     tests::{
         pda::{get_plan_pda, get_subscription_pda},
         utils::{
             days, token_balance, hours, CreatePlan, DeletePlan, ObservedResultExt, Subscribe,
-            TransferSubscription, UpdatePlan, make_backend, World,
+            TransferSubscription, UpdatePlan, World,
         },
     },
 };
@@ -40,7 +40,7 @@ struct Ghost {
 /// Alice subscribes to the merchant's plan (consenting to `original_amount`/hour),
 /// then the merchant sunsets, expires, deletes, and recreates the plan at the
 /// same id with `ghost_amount`/hour and an `end_ts` `ghost_end_days` out.
-fn stage_and_recreate(world: &mut World<LiteSvmBackend>, original_amount: u64, ghost_amount: u64, ghost_end_days: u64) -> Ghost {
+fn stage_and_recreate<B: TestSVM>(world: &mut World<B>, original_amount: u64, ghost_amount: u64, ghost_end_days: u64) -> Ghost {
     let alice = world.actor("alice");
     let merchant = world.actor("merchant");
     let mint = world.usdc_mint(&alice);
@@ -89,9 +89,8 @@ fn stage_and_recreate(world: &mut World<LiteSvmBackend>, original_amount: u64, g
     Ghost { alice, merchant, mint, plan_pda, subscription_pda, alice_ata, merchant_ata }
 }
 
-#[test]
-fn finding_3_1_2_ghost_plan_inflated_amount_drains() {
-    let mut world = World::new(make_backend(), 
+pub fn finding_3_1_2_ghost_plan_inflated_amount_drains<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "AUDIT 3.1.2 (regression): the fix refuses the inflated ghost plan",
         "the merchant recreates the plan at 100M/hour and pulls far more than Alice consented to (Cantina HIGH 3.1.2)",
     );
@@ -120,9 +119,8 @@ fn finding_3_1_2_ghost_plan_inflated_amount_drains() {
     world.md().check("Alice was not drained", alice_before, alice_after);
 }
 
-#[test]
-fn finding_3_1_4_ghost_plan_extended_end_ts_siphons() {
-    let mut world = World::new(make_backend(), 
+pub fn finding_3_1_4_ghost_plan_extended_end_ts_siphons<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "AUDIT 3.1.4 (regression): the fix refuses the extended-end_ts ghost plan",
         "the merchant recreates the plan with a 60-day end_ts and keeps pulling past the original end (Cantina HIGH 3.1.4)",
     );
@@ -148,4 +146,3 @@ fn finding_3_1_4_ghost_plan_extended_end_ts_siphons() {
     world.md().check("the fix refuses the post-original-end pull (PlanTermsMismatch)", false, siphoned);
     world.md().check("the merchant siphoned nothing — the pull was refused", 0, merchant_got);
 }
-

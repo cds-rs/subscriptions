@@ -6,7 +6,7 @@
 //! pulls against it through the observed `send_*`. Every send renders its surface
 //! into the test's report under `target/md-reports/`.
 
-use litesvm_utils::{LiteSvmBackend, TestSVM};
+use testsvm::TestSVM;
 
 use crate::{
     event_engine::event_authority_pda,
@@ -19,12 +19,12 @@ use crate::{
         utils::{
             days, token_balance, init_aux_token_account, init_mint, install_transfer_hook_extra_metas,
             load_transfer_hook_example, set_transfer_hook_config, CloseSubscriptionAuthority, CreateDelegation,
-            ObservedResultExt, RevokeDelegation, TransferDelegation, make_backend, World, TRANSFER_HOOK_EXAMPLE_PROGRAM_ID,
+            ObservedResultExt, RevokeDelegation, TransferDelegation, World, TRANSFER_HOOK_EXAMPLE_PROGRAM_ID,
         },
     },
     SubscriptionsError,
 };
-use litesvm_utils::Keypair;
+use solana_keypair::Keypair;
 use solana_instruction::{AccountMeta, Instruction};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
@@ -36,8 +36,8 @@ use spl_token_interface::instruction::TokenInstruction::Approve;
 /// mint, funds her ATA, and creates a fixed delegation to Bob. Mirrors the
 /// suite's `setup_fixed_delegation`, but every send is observed. Returns the cast
 /// and the derived accounts (minus the LiteSVM, which the World owns).
-fn setup_fixed_delegation(
-    world: &mut World<LiteSvmBackend>,
+fn setup_fixed_delegation<B: TestSVM>(
+    world: &mut World<B>,
     amount: u64,
     expiry_ts: i64,
     nonce: u64,
@@ -61,9 +61,8 @@ fn setup_fixed_delegation(
     (alice, bob, delegation_pda, mint, alice_ata, bob_ata)
 }
 
-#[test]
-fn test_fixed_transfer_success() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_success<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer succeeds",
         "Bob pulls part of his fixed allowance; the remaining allowance decrements",
     );
@@ -95,9 +94,8 @@ fn test_fixed_transfer_success() {
     world.md().check("the expiry is unchanged", expiry_ts, del_expiry);
 }
 
-#[test]
-fn test_fixed_transfer_token_2022_transfer_fee() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_token_2022_transfer_fee<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer over a Token-2022 transfer-fee mint",
         "the transfer fee is withheld from the receiver; the allowance decrements by the gross amount",
     );
@@ -140,9 +138,8 @@ fn test_fixed_transfer_token_2022_transfer_fee() {
     world.md().check("the allowance decrements by the gross 10 tokens", 40_000_000, remaining_amount);
 }
 
-#[test]
-fn test_fixed_transfer_token_2022_confidential_transfer_public_balance() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_token_2022_confidential_transfer_public_balance<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer over a Token-2022 confidential-transfer mint",
         "a transfer of the public balance over a confidential-transfer mint succeeds",
     );
@@ -181,9 +178,8 @@ fn test_fixed_transfer_token_2022_confidential_transfer_public_balance() {
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 }
 
-#[test]
-fn test_fixed_transfer_token_2022_unconfigured_transfer_hook() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_token_2022_unconfigured_transfer_hook<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer over a Token-2022 unconfigured transfer-hook mint",
         "a mint carrying an unconfigured transfer hook still transfers",
     );
@@ -222,9 +218,8 @@ fn test_fixed_transfer_token_2022_unconfigured_transfer_hook() {
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 }
 
-#[test]
-fn test_fixed_transfer_token_2022_active_transfer_hook() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_token_2022_active_transfer_hook<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer over a Token-2022 active transfer-hook mint",
         "a transfer without the hook accounts fails; with them, the hook runs and the transfer succeeds",
     );
@@ -283,9 +278,8 @@ fn test_fixed_transfer_token_2022_active_transfer_hook() {
     world.md().check("the transfer hook ran once", 1, hook_runs);
 }
 
-#[test]
-fn active_hook_transfer_without_validation_pda_fails() {
-    let mut world = World::new(make_backend(), 
+pub fn active_hook_transfer_without_validation_pda_fails<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Active hook transfer without the validation PDA fails",
         "supplying the hook program but not its validation PDA is rejected",
     );
@@ -329,9 +323,8 @@ fn active_hook_transfer_without_validation_pda_fails() {
     );
 }
 
-#[test]
-fn test_fixed_transfer_multiple_times() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_multiple_times<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer cannot exceed the allowance across pulls",
         "after one pull, a second pull for more than the remaining allowance is refused",
     );
@@ -377,9 +370,8 @@ fn test_fixed_transfer_multiple_times() {
     world.md().check("the remaining allowance is still 20 tokens", 20_000_000, del_amount);
 }
 
-#[test]
-fn test_fixed_transfer_exceeds_amount() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_exceeds_amount<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer exceeding the allowance is refused",
         "a single pull for more than the full allowance is refused and leaves the delegation untouched",
     );
@@ -407,9 +399,8 @@ fn test_fixed_transfer_exceeds_amount() {
     world.md().check("the full allowance is intact", 50_000_000, del_amount);
 }
 
-#[test]
-fn test_fixed_transfer_expired() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_expired<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer after expiry is refused",
         "a pull within the window succeeds; after the clock passes expiry, a further pull is refused",
     );
@@ -447,9 +438,8 @@ fn test_fixed_transfer_expired() {
     world.md().check("the remaining allowance is 20 tokens", 20_000_000, delegation_amount);
 }
 
-#[test]
-fn test_fixed_transfer_wrong_signer() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_wrong_signer<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer by the wrong signer is refused",
         "Mallory, who is not the delegatee, cannot pull against Bob's delegation",
     );
@@ -471,9 +461,8 @@ fn test_fixed_transfer_wrong_signer() {
     world.send_err(&[ix], &[&mallory], "TransferFixed (wrong signer)", SubscriptionsError::Unauthorized);
 }
 
-#[test]
-fn test_fixed_transfer_to_third_party() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_to_third_party<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer to a third party",
         "Bob, the delegatee, routes a pull to Charlie's account",
     );
@@ -500,9 +489,8 @@ fn test_fixed_transfer_to_third_party() {
     world.md().check("Charlie received 10 tokens", 10_000_000, charlie_balance);
 }
 
-#[test]
-fn fixed_delegation_rejects_transfer_with_different_mint_authority() {
-    let mut world = World::new(make_backend(), 
+pub fn fixed_delegation_rejects_transfer_with_different_mint_authority<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed delegation rejects a different-mint transfer",
         "a low-value delegation cannot be replayed against a high-value mint's accounts",
     );
@@ -549,9 +537,8 @@ fn fixed_delegation_rejects_transfer_with_different_mint_authority() {
     world.md().check("the low-value allowance is intact", fixed_allowance, remaining_allowance);
 }
 
-#[test]
-fn fixed_transfer_rejects_approved_non_canonical_source() {
-    let mut world = World::new(make_backend(), 
+pub fn fixed_transfer_rejects_approved_non_canonical_source<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer rejects a non-canonical source",
         "an auxiliary (non-ATA) source the authority was Approve'd over cannot be drained via a delegation",
     );
@@ -612,11 +599,10 @@ fn fixed_transfer_rejects_approved_non_canonical_source() {
     world.md().check("the allowance is intact", fixed_allowance, remaining_allowance);
 }
 
-#[test]
-fn writable_accounts_must_be_writable() {
+pub fn writable_accounts_must_be_writable<B: TestSVM>(backend: B) {
     let writable = idl::writable_account_indices("transferFixed");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Writable accounts must be writable (transferFixed)",
         "flipping any account the transfer writes to read-only is rejected",
     );
@@ -669,11 +655,10 @@ fn writable_accounts_must_be_writable() {
     }
 }
 
-#[test]
-fn signer_accounts_must_be_signers() {
+pub fn signer_accounts_must_be_signers<B: TestSVM>(backend: B) {
     let signers = idl::signer_account_indices("transferFixed");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Signer accounts must sign (transferFixed)",
         "flipping any required signer to non-signer is rejected",
     );
@@ -727,11 +712,10 @@ fn signer_accounts_must_be_signers() {
     }
 }
 
-#[test]
-fn test_fixed_transfer_delegator_mismatch_exploit() {
+pub fn test_fixed_transfer_delegator_mismatch_exploit<B: TestSVM>(backend: B) {
     // This test demonstrates the access control vulnerability where a malicious delegatee
     // can use their own delegation to transfer funds from another user's account.
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Fixed transfer delegator-mismatch exploit is blocked",
         "Bob's self-delegation cannot be used to drain Alice's account by spoofing the delegator",
     );
@@ -766,9 +750,8 @@ fn test_fixed_transfer_delegator_mismatch_exploit() {
     world.md().check("Bob received no funds", 0, bob_balance);
 }
 
-#[test]
-fn test_fixed_transfer_version_mismatch() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_version_mismatch<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer over a stale-version delegation is refused",
         "a delegation whose header version byte was zeroed requires explicit migration",
     );
@@ -792,9 +775,8 @@ fn test_fixed_transfer_version_mismatch() {
     world.md().check("Bob's ATA is empty", 0, bob_balance);
 }
 
-#[test]
-fn test_fixed_transfer_stale_subscription_authority() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_stale_subscription_authority<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer against a re-initialized authority is refused",
         "closing then re-initializing the authority bumps its init_id, staling the delegation",
     );
@@ -827,9 +809,8 @@ fn test_fixed_transfer_stale_subscription_authority() {
     world.send_ok(&[ix], &[&alice], "RevokeDelegation");
 }
 
-#[test]
-fn test_close_subscription_authority_blocks_all_transfers() {
-    let mut world = World::new(make_backend(), 
+pub fn test_close_subscription_authority_blocks_all_transfers<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Closing the authority blocks all delegations",
         "after the authority is closed, every outstanding delegation's pull is refused",
     );
@@ -890,9 +871,8 @@ fn test_close_subscription_authority_blocks_all_transfers() {
     world.send_ok(&[ix], &[&alice], "RevokeDelegation (Charlie)");
 }
 
-#[test]
-fn test_fixed_transfer_within_drift_window() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_within_drift_window<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer within the drift window succeeds",
         "a pull shortly after the nominal expiry, but within the clock-drift tolerance, succeeds",
     );
@@ -912,9 +892,8 @@ fn test_fixed_transfer_within_drift_window() {
     world.send_ok(&[ix], &[&bob], "TransferFixed (within drift window)");
 }
 
-#[test]
-fn test_fixed_transfer_past_drift_window() {
-    let mut world = World::new(make_backend(), 
+pub fn test_fixed_transfer_past_drift_window<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Fixed transfer past the drift window is refused",
         "a pull well past expiry, beyond the clock-drift tolerance, is refused",
     );

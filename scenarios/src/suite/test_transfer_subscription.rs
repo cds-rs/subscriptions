@@ -15,7 +15,7 @@ use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
-use litesvm_utils::{LiteSvmBackend, TestSVM};
+use testsvm::TestSVM;
 
 use crate::{
     event_engine::event_authority_pda,
@@ -25,7 +25,7 @@ use crate::{
         pda::{get_plan_pda, get_subscription_authority_pda},
         utils::{
             days, token_balance, hours, init_ata, CancelSubscription, CreatePlan, CreateSubscription,
-            DeletePlan, ObservedResultExt, TransferSubscription, UpdatePlan, make_backend, World,
+            DeletePlan, ObservedResultExt, TransferSubscription, UpdatePlan, World,
         },
     },
     SubscriptionsError,
@@ -37,8 +37,8 @@ use crate::{
 /// owned values (minus the LiteSVM the world now owns). The subscription is
 /// injected directly with the world's clock as the period start.
 #[allow(clippy::type_complexity)]
-fn setup_plan_and_subscription(
-    world: &mut World<LiteSvmBackend>,
+fn setup_plan_and_subscription<B: TestSVM>(
+    world: &mut World<B>,
     amount_per_period: u64,
     period_hours: u64,
     end_ts: i64,
@@ -91,9 +91,8 @@ fn setup_plan_and_subscription(
     (alice, merchant, mint, plan_pda, plan_bump, subscription_pda, alice_ata, merchant_ata)
 }
 
-#[test]
-fn test_transfer_subscription_success() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_success<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: a merchant pulls",
         "the merchant pulls funds against Alice's standing subscription",
     );
@@ -124,9 +123,8 @@ fn test_transfer_subscription_success() {
     world.md().check("the pulled-in-period is 10 tokens", 10_000_000, sub.amount_pulled_in_period);
 }
 
-#[test]
-fn test_transfer_subscription_puller_authorized() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_puller_authorized<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: an authorized puller pulls",
         "a whitelisted puller (not the merchant) pulls against the subscription",
     );
@@ -158,9 +156,8 @@ fn test_transfer_subscription_puller_authorized() {
     world.md().check("the merchant received 10 tokens", 10_000_000, bal);
 }
 
-#[test]
-fn test_transfer_subscription_unauthorized_caller() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_unauthorized_caller<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: an unauthorized caller is refused",
         "Mallory (neither merchant nor whitelisted puller) cannot pull",
     );
@@ -183,9 +180,8 @@ fn test_transfer_subscription_unauthorized_caller() {
     world.send_err(&[ix], &[&mallory], "TransferSubscription (unauthorized)", SubscriptionsError::Unauthorized);
 }
 
-#[test]
-fn test_transfer_subscription_multiple_pulls_within_period() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_multiple_pulls_within_period<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: multiple pulls within a period",
         "two pulls within the same period accumulate up to the period limit",
     );
@@ -223,9 +219,8 @@ fn test_transfer_subscription_multiple_pulls_within_period() {
     world.md().check("the pulled-in-period is 40 tokens", 40_000_000, sub.amount_pulled_in_period);
 }
 
-#[test]
-fn test_transfer_subscription_exceeds_period_limit() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_exceeds_period_limit<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: exceeding the period limit is refused",
         "a single pull over the per-period amount is rejected",
     );
@@ -251,9 +246,8 @@ fn test_transfer_subscription_exceeds_period_limit() {
     world.md().check("the merchant ATA is still empty", 0, bal);
 }
 
-#[test]
-fn test_transfer_subscription_period_rollover() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_period_rollover<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: the period rolls over",
         "advancing past the period boundary resets the pulled amount",
     );
@@ -295,9 +289,8 @@ fn test_transfer_subscription_period_rollover() {
     world.md().check("the pulled-in-period reset to 30 tokens", 30_000_000, sub.amount_pulled_in_period);
 }
 
-#[test]
-fn test_transfer_subscription_plan_expired() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_plan_expired<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: an expired plan is refused",
         "a pull past the plan's end_ts is rejected",
     );
@@ -319,9 +312,8 @@ fn test_transfer_subscription_plan_expired() {
     world.send_err(&[ix], &[&merchant], "TransferSubscription (plan expired)", SubscriptionsError::PlanExpired);
 }
 
-#[test]
-fn test_transfer_subscription_subscription_cancelled() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_subscription_cancelled<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: a cancelled subscription past its period is refused",
         "a pull after the subscription's expires_at_ts (a past period end) is rejected",
     );
@@ -357,9 +349,8 @@ fn test_transfer_subscription_subscription_cancelled() {
     );
 }
 
-#[test]
-fn test_transfer_subscription_cancelled_allows_current_period() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_cancelled_allows_current_period<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: cancellation still allows the current period",
         "a pull within the same period as a cancellation still succeeds",
     );
@@ -387,9 +378,8 @@ fn test_transfer_subscription_cancelled_allows_current_period() {
     world.md().check("the merchant received 10 tokens", 10_000_000, bal);
 }
 
-#[test]
-fn test_transfer_subscription_cancelled_blocks_next_period() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_cancelled_blocks_next_period<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: cancellation blocks the next period",
         "a pull after the period boundary following a cancellation is rejected",
     );
@@ -422,9 +412,8 @@ fn test_transfer_subscription_cancelled_blocks_next_period() {
     );
 }
 
-#[test]
-fn test_transfer_subscription_destination_valid() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_destination_valid<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: a whitelisted destination is allowed",
         "a pull to a whitelisted destination ATA succeeds",
     );
@@ -452,9 +441,8 @@ fn test_transfer_subscription_destination_valid() {
     world.md().check("the destination received 10 tokens", 10_000_000, bal);
 }
 
-#[test]
-fn test_transfer_subscription_destination_invalid() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_destination_invalid<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: a non-whitelisted destination is refused",
         "a pull to an ATA outside the plan's destination whitelist is rejected",
     );
@@ -485,9 +473,8 @@ fn test_transfer_subscription_destination_invalid() {
     );
 }
 
-#[test]
-fn test_transfer_subscription_no_destinations_any_receiver() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_no_destinations_any_receiver<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: no whitelist allows any receiver",
         "with no destination whitelist, a pull to any receiver succeeds",
     );
@@ -514,9 +501,8 @@ fn test_transfer_subscription_no_destinations_any_receiver() {
     world.md().check("Charlie received 10 tokens", 10_000_000, bal);
 }
 
-#[test]
-fn test_transfer_subscription_wrong_subscription_for_plan() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_wrong_subscription_for_plan<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: a mismatched subscription is refused",
         "pulling plan 1 with a subscription minted against plan 2 is rejected",
     );
@@ -571,9 +557,8 @@ fn test_transfer_subscription_wrong_subscription_for_plan() {
     );
 }
 
-#[test]
-fn test_transfer_subscription_zero_amount() {
-    let mut world = World::new(make_backend(), 
+pub fn test_transfer_subscription_zero_amount<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription: a zero amount is refused",
         "a pull of zero tokens is rejected as an invalid amount",
     );
@@ -592,11 +577,10 @@ fn test_transfer_subscription_zero_amount() {
     world.send_err(&[ix], &[&merchant], "TransferSubscription (zero amount)", SubscriptionsError::InvalidAmount);
 }
 
-#[test]
-fn test_transfer_subscription_sunset_allows_transfer() {
+pub fn test_transfer_subscription_sunset_allows_transfer<B: TestSVM>(backend: B) {
     // A sunset plan (status=0) should still allow existing subscription pulls.
     // The plan status doesn't block transfers; only end_ts and subscription expires_at_ts do.
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Transfer subscription: a sunset plan still allows pulls",
         "a plan flipped to sunset status still permits an existing subscription's pull",
     );
@@ -625,11 +609,10 @@ fn test_transfer_subscription_sunset_allows_transfer() {
     world.md().check("the merchant received 10 tokens", 10_000_000, bal);
 }
 
-#[test]
-fn test_transfer_subscription_plan_closed() {
+pub fn test_transfer_subscription_plan_closed<B: TestSVM>(backend: B) {
     // When a Plan account is closed (zeroed + ownership transferred to system program),
     // the transfer must fail with PlanClosed rather than a generic error.
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Transfer subscription: a closed plan is refused",
         "pulling against a plan whose account has been closed is rejected with PlanClosed",
     );
@@ -654,13 +637,12 @@ fn test_transfer_subscription_plan_closed() {
     world.send_err(&[ix], &[&merchant], "TransferSubscription (plan closed)", SubscriptionsError::PlanClosed);
 }
 
-#[test]
-fn writable_accounts_must_be_writable() {
+pub fn writable_accounts_must_be_writable<B: TestSVM>(backend: B) {
     use crate::{instructions::transfer_subscription, tests::idl};
 
     let writable = idl::writable_account_indices("transferSubscription");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Transfer subscription: writable accounts must be writable",
         "flipping any account the instruction writes to read-only is rejected",
     );
@@ -716,13 +698,12 @@ fn writable_accounts_must_be_writable() {
     }
 }
 
-#[test]
-fn signer_accounts_must_be_signers() {
+pub fn signer_accounts_must_be_signers<B: TestSVM>(backend: B) {
     use crate::{instructions::transfer_subscription, tests::idl};
 
     let signers = idl::signer_account_indices("transferSubscription");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Transfer subscription: signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -779,11 +760,10 @@ fn signer_accounts_must_be_signers() {
     }
 }
 
-#[test]
-fn test_subscription_transfer_version_mismatch() {
+pub fn test_subscription_transfer_version_mismatch<B: TestSVM>(backend: B) {
     use crate::state::header::VERSION_OFFSET;
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Transfer subscription: a version-mismatched subscription is refused",
         "a subscription account with a downgraded version requires migration before a pull",
     );
@@ -813,11 +793,10 @@ fn test_subscription_transfer_version_mismatch() {
     world.md().check("the merchant ATA is still empty", 0, bal);
 }
 
-#[test]
-fn test_subscription_transfer_stale_subscription_authority() {
+pub fn test_subscription_transfer_stale_subscription_authority<B: TestSVM>(backend: B) {
     use crate::tests::utils::CloseSubscriptionAuthority;
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Transfer subscription: a stale subscription authority is refused",
         "re-initializing the authority bumps its init_id, staling the subscription's pull",
     );
@@ -851,11 +830,10 @@ fn test_subscription_transfer_stale_subscription_authority() {
     world.md().check("the merchant ATA is still empty", 0, bal);
 }
 
-#[test]
-fn test_transfer_subscription_ghost_plan_rejected() {
+pub fn test_transfer_subscription_ghost_plan_rejected<B: TestSVM>(backend: B) {
     use crate::state::common::PlanStatus;
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Transfer subscription: a ghost (re-created) plan is refused",
         "a plan deleted and re-created at the same PDA with new terms staling the subscription's pull",
     );

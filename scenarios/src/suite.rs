@@ -8,6 +8,9 @@
 //! gating fee-dependent assertions on [`crate::tests::utils::World::capabilities`].
 
 pub mod audit_regression_3_1_1;
+pub mod audit_regression_3_1_3;
+pub mod audit_regression_ghost_plan;
+pub mod behavior_transfer_subscription_alt;
 pub mod cancel_subscription;
 pub mod close_subscription_authority;
 pub mod create_fixed_delegation;
@@ -20,4 +23,7 @@ pub mod revoke_abandoned_delegation;
 pub mod revoke_delegation;
 pub mod revoke_subscription_authority;
 pub mod subscribe;
+pub mod test_transfer_fixed_delegation;
+pub mod test_transfer_recurring_delegation;
+pub mod test_transfer_subscription;
 pub mod update_plan;

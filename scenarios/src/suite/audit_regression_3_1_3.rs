@@ -8,16 +8,15 @@
 //! the rent and `Allocate`/`Assign`s in place, so creation succeeds and this test
 //! (which asserts creation is blocked) fails: that failure is the fix's proof.
 
-use litesvm_utils::TestSVM;
+use testsvm::TestSVM;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use crate::tests::{pda::get_subscription_authority_pda, utils::{make_backend, World}};
+use crate::tests::{pda::get_subscription_authority_pda, utils::World};
 
-#[test]
-fn finding_3_1_3_prefunded_pda_blocks_creation() {
-    let mut world = World::new(make_backend(), 
+pub fn finding_3_1_3_prefunded_pda_blocks_creation<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "AUDIT 3.1.3 (regression): the fix survives a pre-funded PDA",
         "the PR5 fix tops up a pre-funded PDA so Alice can still initialize (Cantina HIGH 3.1.3)",
     );
@@ -51,4 +50,3 @@ fn finding_3_1_3_prefunded_pda_blocks_creation() {
     );
     world.md().check("the fix survives the pre-funded PDA (creation succeeds)", false, blocked);
 }
-

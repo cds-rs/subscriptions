@@ -6,7 +6,7 @@
 //! and pulls against it through the observed `send_*`. Every send renders its
 //! surface into the test's report under `target/md-reports/`.
 
-use litesvm_utils::{LiteSvmBackend, TestSVM};
+use testsvm::TestSVM;
 
 use crate::{
     event_engine::event_authority_pda,
@@ -18,12 +18,12 @@ use crate::{
         pda::get_subscription_authority_pda,
         utils::{
             days, token_balance, hours, init_aux_token_account, init_mint, minutes,
-            CloseSubscriptionAuthority, CreateDelegation, ObservedResultExt, TransferDelegation, make_backend, World,
+            CloseSubscriptionAuthority, CreateDelegation, ObservedResultExt, TransferDelegation, World,
         },
     },
     SubscriptionsError,
 };
-use litesvm_utils::Keypair;
+use solana_keypair::Keypair;
 use solana_instruction::{AccountMeta, Instruction};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
@@ -36,8 +36,8 @@ use spl_token_interface::instruction::TokenInstruction::{Approve, Revoke};
 /// suite's `setup_recurring_delegation`, but every send is observed. Returns the
 /// cast and the derived accounts (minus the LiteSVM, which the World owns).
 #[allow(clippy::too_many_arguments)]
-fn setup_recurring_delegation(
-    world: &mut World<LiteSvmBackend>,
+fn setup_recurring_delegation<B: TestSVM>(
+    world: &mut World<B>,
     amount_per_period: u64,
     period_length_s: u64,
     start_ts: i64,
@@ -65,9 +65,8 @@ fn setup_recurring_delegation(
     (alice, bob, delegation_pda, mint, alice_ata, bob_ata, init_pda)
 }
 
-#[test]
-fn test_recurring_transfer_success() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_success<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer succeeds across pulls within a period",
         "Bob pulls repeatedly within one period; the amount pulled accumulates toward the period limit",
     );
@@ -130,9 +129,8 @@ fn test_recurring_transfer_success() {
     world.md().check("30 tokens pulled in the period", 30_000_000, delegation.amount_pulled_in_period);
 }
 
-#[test]
-fn test_recurring_transfer_exceeds_period_limit() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_exceeds_period_limit<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer exceeding the period limit is refused",
         "a single pull for more than the per-period allowance is refused",
     );
@@ -163,9 +161,8 @@ fn test_recurring_transfer_exceeds_period_limit() {
     world.md().check("Bob's ATA is still empty", 0, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_expired() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_expired<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer after expiry is refused",
         "a pull within the window succeeds; once the clock passes expiry, a further pull is refused",
     );
@@ -203,9 +200,8 @@ fn test_recurring_transfer_expired() {
     world.md().check("Bob's balance is unchanged", 30_000_000, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_multiple_periods() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_multiple_periods<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer resets the allowance each period",
         "after a full period elapses, the amount pulled resets and Bob can pull again",
     );
@@ -252,9 +248,8 @@ fn test_recurring_transfer_multiple_periods() {
     world.md().check("the pulled amount reset to 30 in the new period", 30_000_000, delegation_amount_pulled_in_period);
 }
 
-#[test]
-fn test_recurring_transfer_skip_multiple_periods() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_skip_multiple_periods<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer aligns the period start when periods are skipped",
         "after skipping three periods, the period start jumps forward by a whole number of periods",
     );
@@ -298,8 +293,7 @@ fn test_recurring_transfer_skip_multiple_periods() {
     world.md().check("only 10 tokens pulled in the new period", 10_000_000, delegation.amount_pulled_in_period);
 }
 
-#[test]
-fn test_recurring_transfer_skip_period_cannot_double_claim() {
+pub fn test_recurring_transfer_skip_period_cannot_double_claim<B: TestSVM>(backend: B) {
     // Bug hypothesis: after skipping one period with no claims, the delegatee
     // can claim twice (2x amount_per_period) in the next period.
     //
@@ -310,7 +304,7 @@ fn test_recurring_transfer_skip_period_cannot_double_claim() {
     //
     // Expected: second claim in period 2 should fail — skipped periods
     // do not accumulate allowance.
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Skipped periods do not accumulate allowance",
         "after skipping a period, the delegatee cannot claim twice the per-period allowance in the next",
     );
@@ -365,9 +359,8 @@ fn test_recurring_transfer_skip_period_cannot_double_claim() {
     world.md().check("the period start is aligned to period 2", expected_start, delegation.current_period_start_ts);
 }
 
-#[test]
-fn recurring_delegation_rejects_transfer_with_different_mint_authority() {
-    let mut world = World::new(make_backend(), 
+pub fn recurring_delegation_rejects_transfer_with_different_mint_authority<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring delegation rejects a different-mint transfer",
         "a low-value delegation cannot be replayed against a high-value mint's accounts",
     );
@@ -416,9 +409,8 @@ fn recurring_delegation_rejects_transfer_with_different_mint_authority() {
     world.md().check("the low-value allowance is intact", 0, amount_pulled);
 }
 
-#[test]
-fn recurring_transfer_rejects_approved_non_canonical_source() {
-    let mut world = World::new(make_backend(), 
+pub fn recurring_transfer_rejects_approved_non_canonical_source<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer rejects a non-canonical source",
         "an auxiliary (non-ATA) source the authority was Approve'd over cannot be drained via a delegation",
     );
@@ -470,11 +462,10 @@ fn recurring_transfer_rejects_approved_non_canonical_source() {
     world.md().check("the allowance is intact", 0, amount_pulled);
 }
 
-#[test]
-fn writable_accounts_must_be_writable() {
+pub fn writable_accounts_must_be_writable<B: TestSVM>(backend: B) {
     let writable = idl::writable_account_indices("transferRecurring");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Writable accounts must be writable (transferRecurring)",
         "flipping any account the transfer writes to read-only is rejected",
     );
@@ -530,11 +521,10 @@ fn writable_accounts_must_be_writable() {
     }
 }
 
-#[test]
-fn signer_accounts_must_be_signers() {
+pub fn signer_accounts_must_be_signers<B: TestSVM>(backend: B) {
     let signers = idl::signer_account_indices("transferRecurring");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Signer accounts must sign (transferRecurring)",
         "flipping any required signer to non-signer is rejected",
     );
@@ -591,11 +581,10 @@ fn signer_accounts_must_be_signers() {
     }
 }
 
-#[test]
-fn test_recurring_transfer_delegator_mismatch_exploit() {
+pub fn test_recurring_transfer_delegator_mismatch_exploit<B: TestSVM>(backend: B) {
     // This test demonstrates the access control vulnerability where a malicious delegatee
     // can use their own delegation to transfer funds from another user's account
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Recurring transfer delegator-mismatch exploit is blocked",
         "Bob's self-delegation cannot be used to drain Alice's account by spoofing the delegator",
     );
@@ -638,9 +627,8 @@ fn test_recurring_transfer_delegator_mismatch_exploit() {
     world.md().check("Bob received no funds", 0, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_token_revoke() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_token_revoke<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer after a token Revoke is refused until re-approved for the max",
         "revoking the SPL approval breaks the pull; a partial re-approval still fails; only a max approval restores it",
     );
@@ -726,9 +714,8 @@ fn test_recurring_transfer_token_revoke() {
     world.send_ok(&[ix], &[&bob], "TransferRecurring (after max approval)");
 }
 
-#[test]
-fn test_recurring_transfer_to_third_party() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_to_third_party<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer to a third party",
         "Bob, the delegatee, routes a pull to Charlie's account",
     );
@@ -761,9 +748,8 @@ fn test_recurring_transfer_to_third_party() {
     world.md().check("Charlie received 10 tokens", 10_000_000, charlie_balance);
 }
 
-#[test]
-fn test_recurring_transfer_version_mismatch() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_version_mismatch<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer over a stale-version delegation is refused",
         "a delegation whose header version byte was zeroed requires explicit migration",
     );
@@ -790,9 +776,8 @@ fn test_recurring_transfer_version_mismatch() {
     world.md().check("Bob's ATA is empty", 0, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_stale_subscription_authority() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_stale_subscription_authority<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer against a re-initialized authority is refused",
         "closing then re-initializing the authority bumps its init_id, staling the delegation",
     );
@@ -824,9 +809,8 @@ fn test_recurring_transfer_stale_subscription_authority() {
     world.md().check("Bob's ATA is empty", 0, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_not_started() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_not_started<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer before the start time is refused",
         "a pull before the delegation's start is refused; once the start passes, it succeeds",
     );
@@ -862,9 +846,8 @@ fn test_recurring_transfer_not_started() {
     world.md().check("Bob received 10 tokens", transfer_amount, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_within_drift_window() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_within_drift_window<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer within the drift window succeeds",
         "a pull shortly after the nominal expiry, but within the clock-drift tolerance, succeeds",
     );
@@ -887,9 +870,8 @@ fn test_recurring_transfer_within_drift_window() {
     world.send_ok(&[ix], &[&bob], "TransferRecurring (within drift window)");
 }
 
-#[test]
-fn test_recurring_rollover_blocked_at_expiry_boundary() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_rollover_blocked_at_expiry_boundary<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring rollover blocked at the expiry boundary",
         "when a period would roll over exactly at expiry, the rollover pull is refused",
     );
@@ -926,9 +908,8 @@ fn test_recurring_rollover_blocked_at_expiry_boundary() {
     world.md().check("Bob's balance is unchanged", amount_per_period, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_past_drift_window() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_past_drift_window<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer past the drift window is refused",
         "a pull well past expiry, beyond the clock-drift tolerance, is refused",
     );
@@ -951,9 +932,8 @@ fn test_recurring_transfer_past_drift_window() {
     world.send_err(&[ix], &[&bob], "TransferRecurring (past drift window)", SubscriptionsError::DelegationExpired);
 }
 
-#[test]
-fn test_recurring_transfer_token_2022_transfer_fee() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_token_2022_transfer_fee<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer over a Token-2022 transfer-fee mint",
         "the transfer fee is withheld from the receiver; the amount pulled tracks the gross amount",
     );
@@ -1002,9 +982,8 @@ fn test_recurring_transfer_token_2022_transfer_fee() {
     world.md().check("the amount pulled tracks the gross 10 tokens", 10_000_000, delegation.amount_pulled_in_period);
 }
 
-#[test]
-fn test_recurring_transfer_token_2022_confidential_transfer_public_balance() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_token_2022_confidential_transfer_public_balance<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer over a Token-2022 confidential-transfer mint",
         "a transfer of the public balance over a confidential-transfer mint succeeds",
     );
@@ -1048,9 +1027,8 @@ fn test_recurring_transfer_token_2022_confidential_transfer_public_balance() {
     world.md().check("Bob received 10 tokens", 10_000_000, bob_balance);
 }
 
-#[test]
-fn test_recurring_transfer_token_2022_unconfigured_transfer_hook() {
-    let mut world = World::new(make_backend(), 
+pub fn test_recurring_transfer_token_2022_unconfigured_transfer_hook<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Recurring transfer over a Token-2022 unconfigured transfer-hook mint",
         "a mint carrying an unconfigured transfer hook still transfers",
     );

@@ -31,11 +31,11 @@ pub mod tests {
 #[cfg(test)]
 mod audit_regression_3_1_1_bound;
 #[cfg(test)]
-mod behavior_transfer_subscription_alt;
+mod behavior_transfer_subscription_alt_bound;
 #[cfg(test)]
-mod audit_regression_3_1_3;
+mod audit_regression_3_1_3_bound;
 #[cfg(test)]
-mod audit_regression_ghost_plan;
+mod audit_regression_ghost_plan_bound;
 #[cfg(test)]
 mod test_cancel_subscription_bound;
 #[cfg(test)]
@@ -61,10 +61,10 @@ mod test_revoke_delegation_bound;
 #[cfg(test)]
 mod test_revoke_subscription_authority_bound;
 #[cfg(test)]
-mod test_transfer_fixed_delegation;
+mod test_transfer_fixed_delegation_bound;
 #[cfg(test)]
-mod test_transfer_recurring_delegation;
+mod test_transfer_recurring_delegation_bound;
 #[cfg(test)]
-mod test_transfer_subscription;
+mod test_transfer_subscription_bound;
 #[cfg(test)]
 mod test_update_plan_bound;

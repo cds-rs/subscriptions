@@ -19,14 +19,15 @@
 use solana_signer::Signer;
 use spl_associated_token_account_interface::address::get_associated_token_address_with_program_id;
 
+use testsvm::TestSVM;
+
 use crate::{
-    tests::{constants::TOKEN_PROGRAM_ID, utils::{token_balance, TransferSubscription, make_backend, World}},
+    tests::{constants::TOKEN_PROGRAM_ID, utils::{token_balance, TransferSubscription, World}},
     SubscriptionsError,
 };
 
-#[test]
-fn transfer_subscription_the_authorization_alt() {
-    let mut world = World::new(make_backend(), 
+pub fn transfer_subscription_the_authorization_alt<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Transfer subscription (pull): the authorization alt",
         "the same pull, run by an authorized caller (it lands) and an unauthorized one (Unauthorized), \
          mirroring the alt block in the ADR-002 sequence diagram",
