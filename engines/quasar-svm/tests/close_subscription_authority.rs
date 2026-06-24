@@ -10,7 +10,7 @@
 //! independent of the transaction fee, so they need no gate under quasar's
 //! `Fee: 0`.
 
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;

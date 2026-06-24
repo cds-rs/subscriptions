@@ -2,7 +2,7 @@
 # which cannot share the main subscriptions lockfile (excluded there). Same
 # scenarios harness, different backend, separate lock.
 [package]
-name = "subscriptions-quasar-spike"
+name = "subscriptions-quasar-svm"
 version = "0.1.0"
 edition = "2021"
 

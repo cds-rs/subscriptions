@@ -5,7 +5,7 @@
 //! `test_update_plan_bound.rs`. `bind_scenarios!` emits one `#[test]` per
 //! scenario, each calling the generic body with a fresh `make_quasar_backend()`.
 
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;

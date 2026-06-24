@@ -9,7 +9,7 @@
 //! balance grew") holds via the rent the merchant reclaims, independent of the
 //! transaction fee, so it needs no gate even though quasar models `Fee: 0`.
 
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;

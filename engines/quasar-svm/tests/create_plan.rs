@@ -7,7 +7,7 @@
 //! The same titles run here; the rendered surface differs by engine, hence the
 //! separate report dir set in `.cargo/config.toml`.
 
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;

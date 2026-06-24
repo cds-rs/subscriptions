@@ -7,7 +7,7 @@
 //! body with a fresh `make_quasar_backend()`. The rent-recovery assertions use a
 //! 10_000-lamport tolerance, which holds at Fee:0, so none are fee-gated.
 
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;

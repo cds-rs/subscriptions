@@ -16,7 +16,7 @@
 //! rent the sponsor pays for the Subscription PDA, independent of the fee, so it
 //! needs no gate and runs on every engine.
 
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;

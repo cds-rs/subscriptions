@@ -8,7 +8,7 @@
 //! fee-gated "Alice paid the revoke fee" check in
 //! `create_fixed_delegation_with_sponsor` runs here too.
 
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;

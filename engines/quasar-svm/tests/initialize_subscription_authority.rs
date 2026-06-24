@@ -21,7 +21,7 @@ use spl_token_2022_interface::extension::ExtensionType;
 
 use scenarios::suite::initialize_subscription_authority::initialize_subscription_authority_token_2022_case;
 use scenarios::SubscriptionsError;
-use subscriptions_quasar_spike::make_quasar_backend;
+use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;
