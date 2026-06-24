@@ -1,26 +1,31 @@
 //! `delete_plan`, converted to the World/scenario pattern.
 //!
 //! The plan owner is the `merchant`; the unauthorized caller is `mallory`.
-//! Each test builds its own `World`, stages a plan through the observed
-//! `CreatePlan`/`UpdatePlan` actions, then deletes it (or fails to). Every send
-//! renders its surface into the test's report under `target/md-reports/`.
+//! Each test builds its own `World` over the handed backend, stages a plan
+//! through the observed `CreatePlan`/`UpdatePlan` actions, then deletes it (or
+//! fails to). Every send renders its surface into the test's report under
+//! `target/md-reports/`.
+//!
+//! The one balance-shaped assertion (`delete_plan_happy_path`'s "the merchant's
+//! balance grew") holds via the rent the merchant reclaims, independent of the
+//! transaction fee; the `rent - 10000` tolerance on the follow-up `assert!`
+//! already absorbs the fee, so it needs no capability gate.
 
 use solana_signer::Signer;
 
-use litesvm_utils::TestSVM;
+use testsvm::TestSVM;
 
 use crate::{
     state::common::PlanStatus,
     tests::{
         constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
-        utils::{days, init_mint, CreatePlan, DeletePlan, UpdatePlan, make_backend, World},
+        utils::{days, init_mint, CreatePlan, DeletePlan, UpdatePlan, World},
     },
     SubscriptionsError,
 };
 
-#[test]
-fn delete_plan_happy_path() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_plan_happy_path<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Delete a sunset, expired plan",
         "the merchant sunsets a plan, lets it expire, then reclaims its rent by deleting it",
     );
@@ -60,9 +65,8 @@ fn delete_plan_happy_path() {
     assert!(owner_balance_after >= owner_balance_before + rent - 10000);
 }
 
-#[test]
-fn delete_plan_not_owner() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_plan_not_owner<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject delete by a non-owner",
         "an unauthorized caller (Mallory) cannot delete the merchant's plan",
     );
@@ -94,9 +98,8 @@ fn delete_plan_not_owner() {
     world.md().check("the plan survives the unauthorized delete", true, still_funded);
 }
 
-#[test]
-fn delete_active_expired_plan() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_active_expired_plan<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Delete an active but expired plan",
         "an Active plan past its end_ts can be deleted (sunset is not required)",
     );
@@ -123,9 +126,8 @@ fn delete_active_expired_plan() {
     world.md().check("the plan account is drained", true, plan_drained);
 }
 
-#[test]
-fn delete_active_not_expired_fails() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_active_not_expired_fails<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject delete of an unexpired Active plan",
         "an Active plan whose end_ts is still in the future cannot be deleted",
     );
@@ -146,9 +148,8 @@ fn delete_active_not_expired_fails() {
     world.send_err(&[delete_ix], &[&merchant], "DeletePlan (not expired)", SubscriptionsError::PlanNotExpired);
 }
 
-#[test]
-fn delete_sunset_not_expired_fails() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_sunset_not_expired_fails<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject delete of a sunset but unexpired plan",
         "sunsetting does not waive the expiry check; an unexpired sunset plan cannot be deleted",
     );
@@ -172,9 +173,8 @@ fn delete_sunset_not_expired_fails() {
     world.send_err(&[delete_ix], &[&merchant], "DeletePlan (sunset, not expired)", SubscriptionsError::PlanNotExpired);
 }
 
-#[test]
-fn delete_sunset_exactly_at_end_ts_fails() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_sunset_exactly_at_end_ts_fails<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject delete exactly at end_ts",
         "the expiry boundary is exclusive: a plan exactly at its end_ts is not yet deletable",
     );
@@ -200,9 +200,8 @@ fn delete_sunset_exactly_at_end_ts_fails() {
     world.send_err(&[delete_ix], &[&merchant], "DeletePlan (exactly at end_ts)", SubscriptionsError::PlanNotExpired);
 }
 
-#[test]
-fn delete_plan_double_delete_fails() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_plan_double_delete_fails<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a double delete",
         "deleting an already-deleted plan fails (the account is gone)",
     );
@@ -233,9 +232,8 @@ fn delete_plan_double_delete_fails() {
     world.md().check("the second delete is refused", false, res.is_success());
 }
 
-#[test]
-fn delete_plan_data_zeroed() {
-    let mut world = World::new(make_backend(), 
+pub fn delete_plan_data_zeroed<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Delete zeroes the plan data",
         "after a delete, any lingering account bytes are zeroed",
     );

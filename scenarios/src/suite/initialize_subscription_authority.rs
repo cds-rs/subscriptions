@@ -1,19 +1,27 @@
 //! `initialize_subscription_authority`, converted to the World/scenario pattern.
 //!
-//! Each test builds a `World`, draws its actors from the cast (`alice` the
-//! principal, `sponsor` the payer, `mallory` the adversary), runs setup through
-//! the fabrication helpers, and performs the on-chain action through the
-//! `init_authority` verb or the observed `send_*`. Every send renders its
-//! surface into the test's report under `target/md-reports/`.
+//! Each test builds a `World` over the handed backend, draws its actors from the
+//! cast (`alice` the principal, `sponsor` the payer, `mallory` the adversary),
+//! runs setup through the fabrication helpers, and performs the on-chain action
+//! through the `init_authority` verb or the observed `send_*`. Every send renders
+//! its surface into the test's report under `target/md-reports/`.
+//!
+//! The sponsor-funded case (`initialize_subscription_authority_with_sponsor`)
+//! asserts that Alice's lamports are untouched (fee-independent: the sponsor
+//! pays) and that the sponsor was charged (it pays the PDA's rent regardless of
+//! the transaction fee), so both hold on a fee-less engine and need no gate.
+//!
+//! The Token-2022 rstest case is parametrized, so its `#[test]` shims live in the
+//! engine bindings; the generic worker is
+//! [`initialize_subscription_authority_token_2022_case`].
 
-use rstest::rstest;
 use solana_account::Account;
 use solana_instruction::{AccountMeta, Instruction};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use spl_token_2022_interface::extension::ExtensionType;
 
-use litesvm_utils::TestSVM;
+use testsvm::TestSVM;
 
 use crate::{
     instructions::initialize_subscription_authority,
@@ -21,17 +29,16 @@ use crate::{
         constants::{MINT_DECIMALS, PROGRAM_ID, SYSTEM_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID},
         idl,
         pda::get_subscription_authority_pda,
-        utils::{as_pubkey, 
+        utils::{as_pubkey,
             fetch_account, init_aux_token_account, init_mint, set_transfer_hook_config, ObservedResultExt,
-            make_backend, World,
+            World,
         },
     },
     AccountDiscriminator, SubscriptionAuthority, SubscriptionsError,
 };
 
-#[test]
-fn initialize_subscription_authority() {
-    let mut world = World::new(make_backend(), 
+pub fn initialize_subscription_authority<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Initialize a subscription authority",
         "Alice initializes her SubscriptionAuthority and delegates her ATA to it",
     );
@@ -67,9 +74,8 @@ fn initialize_subscription_authority() {
     world.md().check("the delegated amount is u64::MAX", u64::MAX, ata_account.delegated_amount);
 }
 
-#[test]
-fn initialize_subscription_authority_rejects_non_canonical_token_account() {
-    let mut world = World::new(make_backend(), 
+pub fn initialize_subscription_authority_rejects_non_canonical_token_account<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a non-canonical token account",
         "an auxiliary (non-ATA) token account is rejected where the canonical ATA is required",
     );
@@ -101,9 +107,8 @@ fn initialize_subscription_authority_rejects_non_canonical_token_account() {
     );
 }
 
-#[test]
-fn initialize_subscription_authority_with_sponsor() {
-    let mut world = World::new(make_backend(), 
+pub fn initialize_subscription_authority_with_sponsor<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Initialize with a sponsor",
         "a sponsor pays rent and the fee; Alice's lamports stay untouched",
     );
@@ -138,22 +143,15 @@ fn initialize_subscription_authority_with_sponsor() {
     assert_eq!(ata_account.delegated_amount, u64::MAX);
 }
 
-#[rstest]
-#[case::no_extensions(&[], None)]
-#[case::confidential_transfer(&[ExtensionType::ConfidentialTransferMint], None)]
-#[case::non_transferable(&[ExtensionType::NonTransferable], None)]
-#[case::permanent_delegate(&[ExtensionType::PermanentDelegate], None)]
-#[case::transfer_fee(&[ExtensionType::TransferFeeConfig], None)]
-#[case::transfer_hook_unconfigured(&[ExtensionType::TransferHook], None)]
-#[case::pausable(&[ExtensionType::Pausable], None)]
-#[case::close_authority(&[ExtensionType::MintCloseAuthority], None)]
-#[case::mixed_allowed(&[ExtensionType::TransferFeeConfig, ExtensionType::TransferHook], None)]
-#[case::mixed_allowed_confidential(&[ExtensionType::MintCloseAuthority, ExtensionType::ConfidentialTransferMint], None)]
-fn initialize_subscription_authority_token_2022(
-    #[case] extensions: &[ExtensionType],
-    #[case] expected_error: Option<SubscriptionsError>,
+/// The generic worker behind the `initialize_subscription_authority_token_2022`
+/// rstest. Its `#[test]` shims (one per extension set) live in the engine
+/// bindings, since `bind_scenarios!` emits a bare `#[test] fn`.
+pub fn initialize_subscription_authority_token_2022_case<B: TestSVM>(
+    backend: B,
+    extensions: &[ExtensionType],
+    expected_error: Option<SubscriptionsError>,
 ) {
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         &format!("Initialize over a Token-2022 mint ({extensions:?})"),
         "the authority initializes over a Token-2022 mint with the given extensions",
     );
@@ -189,9 +187,8 @@ fn initialize_subscription_authority_token_2022(
     }
 }
 
-#[test]
-fn initialize_subscription_authority_allows_active_transfer_hook() {
-    let mut world = World::new(make_backend(), 
+pub fn initialize_subscription_authority_allows_active_transfer_hook<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Allow an active transfer hook",
         "a mint carrying a configured transfer hook is accepted",
     );
@@ -216,9 +213,8 @@ fn initialize_subscription_authority_allows_active_transfer_hook() {
     assert!(ata_account.delegate.is_some());
 }
 
-#[test]
-fn initialize_subscription_authority_allows_mutable_inactive_transfer_hook() {
-    let mut world = World::new(make_backend(), 
+pub fn initialize_subscription_authority_allows_mutable_inactive_transfer_hook<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Allow a mutable inactive transfer hook",
         "a mint with a mutable but unset transfer hook is accepted",
     );
@@ -243,9 +239,8 @@ fn initialize_subscription_authority_allows_mutable_inactive_transfer_hook() {
     assert!(ata_account.delegate.is_some());
 }
 
-#[test]
-fn wrong_token_program_returns_error() {
-    let mut world = World::new(make_backend(), 
+pub fn wrong_token_program_returns_error<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a forged token program",
         "passing a non-token account in the token-program slot is rejected",
     );
@@ -277,9 +272,8 @@ fn wrong_token_program_returns_error() {
 
 /// Pre-funding a SubscriptionAuthority PDA with lamports (a griefing attempt)
 /// must not prevent the legitimate user from creating the account.
-#[test]
-fn initialize_subscription_authority_with_prefunded_pda() {
-    let mut world = World::new(make_backend(), 
+pub fn initialize_subscription_authority_with_prefunded_pda<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Survive a pre-funded PDA",
         "a griefer pre-funds the authority PDA; Alice can still initialize it",
     );
@@ -315,9 +309,8 @@ fn initialize_subscription_authority_with_prefunded_pda() {
     assert_eq!(ata_account.delegated_amount, u64::MAX);
 }
 
-#[test]
-fn initialize_subscription_authority_with_overfunded_pda() {
-    let mut world = World::new(make_backend(), 
+pub fn initialize_subscription_authority_with_overfunded_pda<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Survive an over-funded PDA",
         "a griefer over-funds the authority PDA; Alice can still initialize it",
     );
@@ -351,11 +344,10 @@ fn initialize_subscription_authority_with_overfunded_pda() {
     assert_eq!(ata_account.delegated_amount, u64::MAX);
 }
 
-#[test]
-fn writable_accounts_must_be_writable() {
+pub fn writable_accounts_must_be_writable<B: TestSVM>(backend: B) {
     let writable = idl::writable_account_indices("initSubscriptionAuthority");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Writable accounts must be writable",
         "flipping any account the instruction writes to read-only is rejected",
     );
@@ -395,11 +387,10 @@ fn writable_accounts_must_be_writable() {
     }
 }
 
-#[test]
-fn signer_accounts_must_be_signers() {
+pub fn signer_accounts_must_be_signers<B: TestSVM>(backend: B) {
     let signers = idl::signer_account_indices("initSubscriptionAuthority");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -442,9 +433,8 @@ fn signer_accounts_must_be_signers() {
 
 /// A trailing account is interpreted as the optional sponsor payer; a non-signer
 /// extra must be rejected because the payer slot requires a signer.
-#[test]
-fn non_signer_payer_rejected() {
-    let mut world = World::new(make_backend(), 
+pub fn non_signer_payer_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject a non-signer payer",
         "a trailing non-signer account in the optional payer slot is rejected",
     );

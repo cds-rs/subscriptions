@@ -1,30 +1,29 @@
 //! `update_plan`, converted to the World/scenario pattern.
 //!
 //! The plan owner is the `merchant` from the cast; an unauthorized updater is
-//! `mallory`. Each test builds its own `World`, stages a plan through the
-//! observed `CreatePlan`, then performs the `UpdatePlan` through the
-//! observed `send_*`. Every send renders its surface into the test's report.
+//! `mallory`. Each test builds its own `World` over the handed backend, stages a
+//! plan through the observed `CreatePlan`, then performs the `UpdatePlan` through
+//! the observed `send_*`. Every send renders its surface into the test's report.
 
 use std::vec::Vec;
 
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use litesvm_utils::TestSVM;
+use testsvm::TestSVM;
 
 use crate::{
     state::common::PlanStatus,
     state::plan::Plan,
     tests::{
         constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
-        utils::{as_pubkey, days, init_mint, CreatePlan, UpdatePlan, make_backend, World},
+        utils::{as_pubkey, days, init_mint, CreatePlan, UpdatePlan, World},
     },
     SubscriptionsError,
 };
 
-#[test]
-fn update_plan_happy_path() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_happy_path<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan (happy path)",
         "the merchant sets a plan to Sunset with an end timestamp and a fresh metadata URI",
     );
@@ -59,9 +58,8 @@ fn update_plan_happy_path() {
     assert!(uri.starts_with("https://example.com/updated.json"));
 }
 
-#[test]
-fn update_plan_preserves_immutable_fields() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_preserves_immutable_fields<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan preserves immutable fields",
         "an update touches mutable fields only; amount, period, mint, destinations, and id are unchanged",
     );
@@ -118,9 +116,8 @@ fn update_plan_preserves_immutable_fields() {
     world.md().check("the plan id is unchanged", id_before, id_after);
 }
 
-#[test]
-fn update_plan_not_owner() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_not_owner<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan rejects a non-owner",
         "an unauthorized signer cannot update someone else's plan",
     );
@@ -143,9 +140,8 @@ fn update_plan_not_owner() {
     world.send_err(&[update_ix], &[&non_owner], "UpdatePlan (not owner)", SubscriptionsError::NotPlanOwner);
 }
 
-#[test]
-fn update_plan_invalid_status() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_invalid_status<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan rejects an invalid status",
         "a raw status value outside the valid set is rejected",
     );
@@ -165,9 +161,8 @@ fn update_plan_invalid_status() {
     world.send_err(&[update_ix], &[&owner], "UpdatePlan (invalid status)", SubscriptionsError::InvalidPlanStatus);
 }
 
-#[test]
-fn update_plan_end_ts_in_past() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_end_ts_in_past<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan rejects an end_ts in the past",
         "an end timestamp before the current clock is rejected",
     );
@@ -187,9 +182,8 @@ fn update_plan_end_ts_in_past() {
     world.send_err(&[update_ix], &[&owner], "UpdatePlan (end_ts in past)", SubscriptionsError::InvalidEndTs);
 }
 
-#[test]
-fn update_plan_clear_end_ts() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_clear_end_ts<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan can clear its end_ts",
         "setting end_ts to zero clears the previously set expiry",
     );
@@ -215,9 +209,8 @@ fn update_plan_clear_end_ts() {
     world.md().check("the end timestamp is cleared", 0_i64, ets);
 }
 
-#[test]
-fn update_plan_sunset_is_terminal() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_sunset_is_terminal<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Sunset is terminal",
         "once a plan is sunset it cannot be reverted to Active",
     );
@@ -251,9 +244,8 @@ fn update_plan_sunset_is_terminal() {
     );
 }
 
-#[test]
-fn update_plan_no_op() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_no_op<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan no-op leaves it unchanged",
         "an update with no changed fields leaves the plan account bytes untouched",
     );
@@ -278,9 +270,8 @@ fn update_plan_no_op() {
     world.md().check("the plan bytes are unchanged", true, account_before.data == account_after.data);
 }
 
-#[test]
-fn update_plan_sunset_requires_end_ts() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_sunset_requires_end_ts<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Sunset requires an end_ts",
         "sunsetting a plan without supplying a non-zero end timestamp is rejected",
     );
@@ -300,9 +291,8 @@ fn update_plan_sunset_requires_end_ts() {
     world.send_err(&[update_ix], &[&owner], "UpdatePlan (sunset, no end_ts)", SubscriptionsError::SunsetRequiresEndTs);
 }
 
-#[test]
-fn update_plan_at_exact_expiry_boundary() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_at_exact_expiry_boundary<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan at the exact expiry boundary",
         "a plan can still be updated at the instant its end timestamp is reached",
     );
@@ -331,9 +321,8 @@ fn update_plan_at_exact_expiry_boundary() {
     assert!(uri.starts_with("https://example.com/at-boundary.json"));
 }
 
-#[test]
-fn update_plan_expired() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_expired<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update an expired plan is rejected",
         "once past its end timestamp, a plan can no longer be updated",
     );
@@ -357,9 +346,8 @@ fn update_plan_expired() {
     world.send_err(&[update_ix], &[&owner], "UpdatePlan (expired)", SubscriptionsError::PlanExpired);
 }
 
-#[test]
-fn update_plan_add_pullers() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_add_pullers<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan can add pullers",
         "an update populates the previously empty puller whitelist",
     );
@@ -396,9 +384,8 @@ fn update_plan_add_pullers() {
     assert_eq!(plan.data.pullers[3].to_bytes(), zero);
 }
 
-#[test]
-fn update_plan_remove_pullers_owner_still_authorized() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_remove_pullers_owner_still_authorized<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Removing pullers keeps the owner authorized",
         "clearing the puller whitelist leaves the plan owner able to pull; a random key cannot",
     );
@@ -437,9 +424,8 @@ fn update_plan_remove_pullers_owner_still_authorized() {
     world.md().check("a random key cannot pull", true, plan.can_pull(&random_addr).is_err());
 }
 
-#[test]
-fn update_plan_replace_pullers() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_replace_pullers<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan replaces the puller whitelist",
         "an update overwrites the existing pullers wholesale, not appends",
     );
@@ -471,9 +457,8 @@ fn update_plan_replace_pullers() {
     assert_eq!(plan.data.pullers[1].to_bytes(), zero);
 }
 
-#[test]
-fn update_plan_max_pullers() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_max_pullers<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan fills the puller whitelist to capacity",
         "an update can set the full set of four pullers",
     );
@@ -500,9 +485,8 @@ fn update_plan_max_pullers() {
     }
 }
 
-#[test]
-fn update_plan_rejects_near_immediate_end_ts() {
-    let mut world = World::new(make_backend(), 
+pub fn update_plan_rejects_near_immediate_end_ts<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Update a plan rejects a near-immediate end_ts",
         "an end timestamp only seconds away (shorter than one period) is rejected",
     );

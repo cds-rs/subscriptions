@@ -39,19 +39,19 @@ mod audit_regression_ghost_plan;
 #[cfg(test)]
 mod test_cancel_subscription;
 #[cfg(test)]
-mod test_close_subscription_authority;
+mod test_close_subscription_authority_bound;
 #[cfg(test)]
 mod test_create_fixed_delegation;
 #[cfg(test)]
-mod test_create_plan;
+mod test_create_plan_bound;
 #[cfg(test)]
 mod test_create_recurring_delegation;
 #[cfg(test)]
-mod test_delete_plan;
+mod test_delete_plan_bound;
 #[cfg(test)]
-mod test_initialize_subscription_authority;
+mod test_initialize_subscription_authority_bound;
 #[cfg(test)]
-mod test_resume_subscription;
+mod test_resume_subscription_bound;
 #[cfg(test)]
 mod test_revoke_abandoned_delegation;
 #[cfg(test)]
@@ -59,7 +59,7 @@ mod test_subscribe_bound;
 #[cfg(test)]
 mod test_revoke_delegation;
 #[cfg(test)]
-mod test_revoke_subscription_authority;
+mod test_revoke_subscription_authority_bound;
 #[cfg(test)]
 mod test_transfer_fixed_delegation;
 #[cfg(test)]
@@ -67,4 +67,4 @@ mod test_transfer_recurring_delegation;
 #[cfg(test)]
 mod test_transfer_subscription;
 #[cfg(test)]
-mod test_update_plan;
+mod test_update_plan_bound;

@@ -1,15 +1,15 @@
 //! `resume_subscription`, converted to the World/scenario pattern.
 //!
-//! Each test builds a `World`, stages a cancelled subscription (or builds one
-//! step by step from the cast), and performs the resume through the observed
-//! `send_*`. Every send renders its surface into the test's report under
-//! `target/md-reports/`.
+//! Each test builds a `World` over the handed backend, stages a cancelled
+//! subscription (or builds one step by step from the cast), and performs the
+//! resume through the observed `send_*`. Every send renders its surface into the
+//! test's report under `target/md-reports/`.
 
 use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use litesvm_utils::{LiteSvmBackend, TestSVM};
+use testsvm::TestSVM;
 
 use crate::{
     state::{common::PlanStatus, header::VERSION_OFFSET, subscription_delegation::SubscriptionDelegation},
@@ -17,7 +17,7 @@ use crate::{
         pda::get_subscription_pda,
         utils::{
             days, hours, init_ata, CancelSubscription, CreatePlan, DeletePlan, ObservedResultExt,
-            ResumeSubscription, Subscribe, TransferSubscription, UpdatePlan, make_backend, World,
+            ResumeSubscription, Subscribe, TransferSubscription, UpdatePlan, World,
         },
     },
     SubscriptionsError,
@@ -28,7 +28,7 @@ use crate::{
 /// `PlanExpired`/`PlanClosed` guards in resume become reachable. Builds the
 /// world's state through the observed verbs and returns the owned cast plus the
 /// derived PDAs.
-fn setup_subscription_with_tight_plan_end(world: &mut World<LiteSvmBackend>) -> (Keypair, Keypair, Pubkey, Pubkey) {
+fn setup_subscription_with_tight_plan_end<B: TestSVM>(world: &mut World<B>) -> (Keypair, Keypair, Pubkey, Pubkey) {
     let alice = world.actor("alice");
     let merchant = world.actor("merchant");
 
@@ -57,9 +57,8 @@ fn setup_subscription_with_tight_plan_end(world: &mut World<LiteSvmBackend>) -> 
     (alice, merchant, plan_pda, subscription_pda)
 }
 
-#[test]
-fn resume_subscription_happy_path() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_happy_path<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume a subscription (happy path)",
         "Alice cancels then resumes; the expiry is cleared and the period state is preserved",
     );
@@ -86,9 +85,8 @@ fn resume_subscription_happy_path() {
     world.md().check("the amount pulled is preserved", amount_pulled, sub.amount_pulled_in_period);
 }
 
-#[test]
-fn resume_subscription_rejected_at_cancelled_period_end() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_rejected_at_cancelled_period_end<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejected at the cancelled period end",
         "once the cancelled period has elapsed, both a pull and a resume are refused as cancelled",
     );
@@ -128,9 +126,8 @@ fn resume_subscription_rejected_at_cancelled_period_end() {
     );
 }
 
-#[test]
-fn resume_subscription_not_cancelled_rejected() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_not_cancelled_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejects a live subscription",
         "resuming a subscription that was never cancelled is refused",
     );
@@ -146,9 +143,8 @@ fn resume_subscription_not_cancelled_rejected() {
     );
 }
 
-#[test]
-fn resume_subscription_non_subscriber_rejected() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_non_subscriber_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejects a non-subscriber",
         "Mallory cannot resume a subscription she does not own",
     );
@@ -169,9 +165,8 @@ fn resume_subscription_non_subscriber_rejected() {
     );
 }
 
-#[test]
-fn resume_subscription_plan_mismatch_rejected() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_plan_mismatch_rejected<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejects a mismatched plan",
         "resuming against a different plan than the subscription's is refused",
     );
@@ -201,9 +196,8 @@ fn resume_subscription_plan_mismatch_rejected() {
     );
 }
 
-#[test]
-fn resume_subscription_rejected_after_cancelled_period_elapsed() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_rejected_after_cancelled_period_elapsed<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejected after the cancelled period elapsed",
         "once past the cancelled period boundary, resume is refused as cancelled",
     );
@@ -224,9 +218,8 @@ fn resume_subscription_rejected_after_cancelled_period_elapsed() {
     );
 }
 
-#[test]
-fn resume_subscription_rejected_when_plan_expired() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_rejected_when_plan_expired<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejected when the plan has expired",
         "resume is refused because the plan no longer supports active subscriptions",
     );
@@ -250,9 +243,8 @@ fn resume_subscription_rejected_when_plan_expired() {
     );
 }
 
-#[test]
-fn resume_subscription_allows_when_plan_sunset() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_allows_when_plan_sunset<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume allowed while the plan is sunset",
         "a sunset (but not yet expired) plan still admits a resume",
     );
@@ -279,9 +271,8 @@ fn resume_subscription_allows_when_plan_sunset() {
     world.md().check("the expiry is cleared", 0, sub.expires_at_ts);
 }
 
-#[test]
-fn resume_subscription_rejected_when_plan_deleted() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_rejected_when_plan_deleted<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejected when the plan was deleted",
         "resuming against a closed (deleted) plan is refused",
     );
@@ -306,9 +297,8 @@ fn resume_subscription_rejected_when_plan_deleted() {
     );
 }
 
-#[test]
-fn resume_subscription_cancel_resume_cancel_across_period_boundary() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_cancel_resume_cancel_across_period_boundary<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Cancel, resume, then cancel across a period boundary",
         "the second cancel computes a fresh period boundary rather than reusing the stale one",
     );
@@ -348,9 +338,8 @@ fn resume_subscription_cancel_resume_cancel_across_period_boundary() {
     );
 }
 
-#[test]
-fn resume_subscription_version_mismatch() {
-    let mut world = World::new(make_backend(), 
+pub fn resume_subscription_version_mismatch<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Resume rejects a stale account version",
         "a downgraded version byte forces a MigrationRequired error on resume",
     );

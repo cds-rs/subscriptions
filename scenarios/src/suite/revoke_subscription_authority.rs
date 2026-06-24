@@ -1,28 +1,29 @@
 //! `revoke_subscription_authority`, converted to the World/scenario pattern.
 //!
-//! Each test builds a `World`, draws `alice` (the principal: mint owner,
-//! delegator) from the cast, fabricates her mint and ATA, initializes her
-//! authority through the `init_authority` verb, then performs the revoke (and,
-//! where relevant, the close) through the observed `send_*`. Every send renders
-//! its surface into the test's report under `target/md-reports/`.
+//! Each test builds a `World` over the handed backend, draws `alice` (the
+//! principal: mint owner, delegator) from the cast, fabricates her mint and ATA,
+//! initializes her authority through the `init_authority` verb, then performs the
+//! revoke (and, where relevant, the close) through the observed `send_*`. Every
+//! send renders its surface into the test's report under `target/md-reports/`.
 
 use solana_signer::Signer;
 use spl_token_2022_interface::state::Account as TokenAccount;
+
+use testsvm::TestSVM;
 
 use crate::{
     tests::{
         constants::{MINT_DECIMALS, TOKEN_2022_PROGRAM_ID},
         utils::{
             fetch_account, init_mint, CloseSubscriptionAuthority, ObservedResultExt,
-            RevokeSubscriptionAuthority, make_backend, World,
+            RevokeSubscriptionAuthority, World,
         },
     },
     SubscriptionsError,
 };
 
-#[test]
-fn revoke_subscription_authority_clears_delegate() {
-    let mut world = World::new(make_backend(), 
+pub fn revoke_subscription_authority_clears_delegate<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Revoke clears the delegate",
         "Alice revokes her subscription authority; her ATA's delegate is cleared",
     );
@@ -48,9 +49,8 @@ fn revoke_subscription_authority_clears_delegate() {
     world.md().check("the delegated amount is zeroed after revoke", 0, after.delegated_amount);
 }
 
-#[test]
-fn revoke_subscription_authority_clears_delegate_token_2022() {
-    let mut world = World::new(make_backend(), 
+pub fn revoke_subscription_authority_clears_delegate_token_2022<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Revoke clears the delegate (Token-2022)",
         "Alice revokes her authority over a Token-2022 mint; her ATA's delegate is cleared",
     );
@@ -76,9 +76,8 @@ fn revoke_subscription_authority_clears_delegate_token_2022() {
     world.md().check("the delegated amount is zeroed after revoke", 0, after.delegated_amount);
 }
 
-#[test]
-fn revoke_subscription_authority_works_after_close() {
-    let mut world = World::new(make_backend(), 
+pub fn revoke_subscription_authority_works_after_close<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Revoke works after close",
         "Alice closes her authority leaving a dangling delegate; revoke still clears it",
     );
@@ -114,9 +113,8 @@ fn revoke_subscription_authority_works_after_close() {
     world.md().check("the delegated amount is zeroed", 0, after.delegated_amount);
 }
 
-#[test]
-fn revoke_subscription_authority_rejects_ata_mint_mismatch() {
-    let mut world = World::new(make_backend(), 
+pub fn revoke_subscription_authority_rejects_ata_mint_mismatch<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject an ATA / mint mismatch",
         "revoke is refused when the passed ATA belongs to a different mint than the instruction's mint",
     );

@@ -1,23 +1,28 @@
 //! `close_subscription_authority`, converted to the World/scenario pattern.
 //!
-//! Each test builds a `World`, draws its actors from the cast (`alice` the
-//! principal closing her authority, `sponsor` the rent payer, `mallory` the
-//! adversary), stages the authority through `init_authority`, and performs the
-//! close action through the observed `send_*`. Every send renders its surface into
-//! the test's report under `target/md-reports/`.
+//! Each test builds a `World` over the handed backend, draws its actors from the
+//! cast (`alice` the principal closing her authority, `sponsor` the rent payer,
+//! `mallory` the adversary), stages the authority through `init_authority`, and
+//! performs the close action through the observed `send_*`. Every send renders
+//! its surface into the test's report under `target/md-reports/`.
+//!
+//! The balance-shaped assertions (`close_subscription_authority`'s "Alice's
+//! balance grew" and `close_returns_rent_to_sponsor`'s sponsor inequality) hold
+//! via the rent returned by the close, independent of the transaction fee; the
+//! `rent - 10000` tolerance on each follow-up `assert!` absorbs the fee, so they
+//! need no capability gate.
 
 use solana_signer::Signer;
 
-use litesvm_utils::TestSVM;
+use testsvm::TestSVM;
 
 use crate::{
-    tests::utils::{as_pubkey, CloseSubscriptionAuthority, ObservedResultExt, make_backend, World},
+    tests::utils::{as_pubkey, CloseSubscriptionAuthority, ObservedResultExt, World},
     SubscriptionAuthority, SubscriptionsError,
 };
 
-#[test]
-fn close_subscription_authority() {
-    let mut world = World::new(make_backend(), 
+pub fn close_subscription_authority<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Close a subscription authority",
         "Alice closes her SubscriptionAuthority and the rent returns to her",
     );
@@ -52,9 +57,8 @@ fn close_subscription_authority() {
     assert!(user_balance_after >= user_balance_before + rent - 10000);
 }
 
-#[test]
-fn non_owner_cannot_close() {
-    let mut world = World::new(make_backend(), 
+pub fn non_owner_cannot_close<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "A non-owner cannot close the authority",
         "Mallory cannot close Alice's SubscriptionAuthority",
     );
@@ -82,15 +86,14 @@ fn non_owner_cannot_close() {
     );
 }
 
-#[test]
-fn writable_accounts_must_be_writable() {
+pub fn writable_accounts_must_be_writable<B: TestSVM>(backend: B) {
     use solana_instruction::{AccountMeta, Instruction};
 
     use crate::{instructions::close_subscription_authority, tests::{constants::PROGRAM_ID, idl}};
 
     let writable = idl::writable_account_indices("closeSubscriptionAuthority");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Close: writable accounts must be writable",
         "flipping any account the close writes to read-only is rejected",
     );
@@ -123,15 +126,14 @@ fn writable_accounts_must_be_writable() {
     }
 }
 
-#[test]
-fn signer_accounts_must_be_signers() {
+pub fn signer_accounts_must_be_signers<B: TestSVM>(backend: B) {
     use solana_instruction::{AccountMeta, Instruction};
 
     use crate::{instructions::close_subscription_authority, tests::{constants::PROGRAM_ID, idl}};
 
     let signers = idl::signer_account_indices("closeSubscriptionAuthority");
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Close: signer accounts must sign",
         "flipping any required signer to non-signer is rejected",
     );
@@ -165,9 +167,8 @@ fn signer_accounts_must_be_signers() {
     }
 }
 
-#[test]
-fn close_returns_rent_to_sponsor() {
-    let mut world = World::new(make_backend(), 
+pub fn close_returns_rent_to_sponsor<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Close returns rent to the sponsor",
         "when a sponsor funded the authority, the close returns rent to them",
     );
@@ -197,9 +198,8 @@ fn close_returns_rent_to_sponsor() {
     assert!(sponsor_balance_after >= sponsor_balance_before + rent - 10_000);
 }
 
-#[test]
-fn close_without_receiver_when_sponsor_funded_fails() {
-    let mut world = World::new(make_backend(), 
+pub fn close_without_receiver_when_sponsor_funded_fails<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Close without a receiver fails when a sponsor funded",
         "a sponsor-funded authority cannot be closed without naming the rent receiver",
     );
@@ -223,9 +223,8 @@ fn close_without_receiver_when_sponsor_funded_fails() {
     );
 }
 
-#[test]
-fn close_with_wrong_receiver_unauthorized() {
-    let mut world = World::new(make_backend(), 
+pub fn close_with_wrong_receiver_unauthorized<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Close with the wrong receiver is unauthorized",
         "the rent receiver must be the stored payer, not an arbitrary account",
     );
@@ -249,9 +248,8 @@ fn close_with_wrong_receiver_unauthorized() {
     );
 }
 
-#[test]
-fn idempotent_init_preserves_original_payer() {
-    let mut world = World::new(make_backend(), 
+pub fn idempotent_init_preserves_original_payer<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Idempotent init preserves the original payer",
         "a second init by a different sponsor leaves the stored payer untouched",
     );
@@ -278,9 +276,8 @@ fn idempotent_init_preserves_original_payer() {
     world.md().check("the stored payer is still sponsor A", sponsor_a.pubkey(), as_pubkey(md.payer.to_bytes()));
 }
 
-#[test]
-fn closed_account_is_zeroed() {
-    let mut world = World::new(make_backend(), 
+pub fn closed_account_is_zeroed<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "A closed authority account is zeroed",
         "after closing, any residual account data is all zeros",
     );

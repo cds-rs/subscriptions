@@ -1,16 +1,16 @@
 //! `create_plan`, converted to the World/scenario pattern.
 //!
-//! Each test builds a `World`, draws the `merchant` (plan owner / payee) from the
-//! cast, fabricates a mint, and runs the `CreatePlan` builder's instruction
-//! through the observed backend so every send renders its surface into the
-//! test's report under `target/md-reports/`. Destinations and pullers are
-//! plain props (non-signing pubkeys), not actors.
+//! Each test builds a `World` over the handed backend, draws the `merchant`
+//! (plan owner / payee) from the cast, fabricates a mint, and runs the
+//! `CreatePlan` builder's instruction through the observed backend so every send
+//! renders its surface into the test's report under `target/md-reports/`.
+//! Destinations and pullers are plain props (non-signing pubkeys), not actors.
 
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-use litesvm_utils::TestSVM;
+use testsvm::TestSVM;
 
 use crate::{
     state::common::PlanStatus,
@@ -18,13 +18,12 @@ use crate::{
     tests::{
         constants::{MINT_DECIMALS, TOKEN_PROGRAM_ID},
         pda::get_plan_pda,
-        utils::{as_pubkey, days, init_mint, CreatePlan, make_backend, World},
+        utils::{as_pubkey, days, init_mint, CreatePlan, World},
     },
 };
 
-#[test]
-fn create_plan_happy_path() {
-    let mut world = World::new(make_backend(), "Create a plan (happy path)", "the merchant creates a 30-day plan and every field is recorded");
+pub fn create_plan_happy_path<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Create a plan (happy path)", "the merchant creates a 30-day plan and every field is recorded");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -77,9 +76,8 @@ fn create_plan_happy_path() {
     assert_ne!(bump, 0);
 }
 
-#[test]
-fn create_plan_no_expiry() {
-    let mut world = World::new(make_backend(), "Create a plan with no expiry", "a plan with end_ts 0 never expires");
+pub fn create_plan_no_expiry<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Create a plan with no expiry", "a plan with end_ts 0 never expires");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -104,9 +102,8 @@ fn create_plan_no_expiry() {
     world.md().check("the end timestamp is 0 (no expiry)", 0, ets);
 }
 
-#[test]
-fn create_plan_period_hours_zero() {
-    let mut world = World::new(make_backend(), "Reject a zero-hour period", "a plan with period_hours 0 is rejected");
+pub fn create_plan_period_hours_zero<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Reject a zero-hour period", "a plan with period_hours 0 is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -123,9 +120,8 @@ fn create_plan_period_hours_zero() {
     world.send_err(&[ix], &[&merchant], "CreatePlan (period_hours 0)", crate::SubscriptionsError::InvalidPeriodLength);
 }
 
-#[test]
-fn create_plan_period_hours_exceeds_max() {
-    let mut world = World::new(make_backend(), "Reject an over-long period", "a plan whose period exceeds the max is rejected");
+pub fn create_plan_period_hours_exceeds_max<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Reject an over-long period", "a plan whose period exceeds the max is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -142,9 +138,8 @@ fn create_plan_period_hours_exceeds_max() {
     world.send_err(&[ix], &[&merchant], "CreatePlan (period_hours over max)", crate::SubscriptionsError::InvalidPeriodLength);
 }
 
-#[test]
-fn create_plan_amount_zero() {
-    let mut world = World::new(make_backend(), "Reject a zero amount", "a plan with a zero amount is rejected");
+pub fn create_plan_amount_zero<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Reject a zero amount", "a plan with a zero amount is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -161,9 +156,8 @@ fn create_plan_amount_zero() {
     world.send_err(&[ix], &[&merchant], "CreatePlan (amount 0)", crate::SubscriptionsError::InvalidAmount);
 }
 
-#[test]
-fn create_plan_no_destinations() {
-    let mut world = World::new(make_backend(), "Create a plan with no destinations", "a plan without destinations leaves the slots zeroed");
+pub fn create_plan_no_destinations<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Create a plan with no destinations", "a plan without destinations leaves the slots zeroed");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -183,9 +177,8 @@ fn create_plan_no_destinations() {
     }
 }
 
-#[test]
-fn create_plan_expired_end_ts() {
-    let mut world = World::new(make_backend(), "Reject an already-expired end_ts", "a plan whose end_ts is in the past is rejected");
+pub fn create_plan_expired_end_ts<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Reject an already-expired end_ts", "a plan whose end_ts is in the past is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -203,9 +196,8 @@ fn create_plan_expired_end_ts() {
     world.send_err(&[ix], &[&merchant], "CreatePlan (expired end_ts)", crate::SubscriptionsError::InvalidEndTs);
 }
 
-#[test]
-fn create_plan_end_ts_before_first_period() {
-    let mut world = World::new(make_backend(), 
+pub fn create_plan_end_ts_before_first_period<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Reject an end_ts before the first period",
         "a plan whose end_ts lands before its first period closes is rejected",
     );
@@ -227,9 +219,8 @@ fn create_plan_end_ts_before_first_period() {
     world.send_err(&[ix], &[&merchant], "CreatePlan (end_ts before first period)", crate::SubscriptionsError::InvalidEndTs);
 }
 
-#[test]
-fn create_plan_wrong_pda() {
-    let mut world = World::new(make_backend(), "Reject a forged plan PDA", "passing a non-canonical plan PDA is rejected");
+pub fn create_plan_wrong_pda<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Reject a forged plan PDA", "passing a non-canonical plan PDA is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);
@@ -248,8 +239,7 @@ fn create_plan_wrong_pda() {
     world.send_err(&[ix], &[&merchant], "CreatePlan (wrong PDA)", crate::SubscriptionsError::InvalidPlanPda);
 }
 
-#[test]
-fn create_plan_mint_mismatch_attack() {
+pub fn create_plan_mint_mismatch_attack<B: TestSVM>(backend: B) {
     use solana_instruction::{AccountMeta, Instruction};
 
     use crate::{
@@ -260,7 +250,7 @@ fn create_plan_mint_mismatch_attack() {
         },
     };
 
-    let mut world = World::new(make_backend(), 
+    let mut world = World::new(backend,
         "Reject a mint-mismatch attack",
         "a forged instruction whose embedded mint differs from the passed mint account is rejected",
     );
@@ -308,9 +298,8 @@ fn create_plan_mint_mismatch_attack() {
     world.send_err(&[ix], &[&merchant], "CreatePlan (mint mismatch)", crate::SubscriptionsError::MintMismatch);
 }
 
-#[test]
-fn create_plan_prefunded_pda() {
-    let mut world = World::new(make_backend(), 
+pub fn create_plan_prefunded_pda<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend,
         "Survive a pre-funded plan PDA",
         "a griefer pre-funds the plan PDA; the merchant can still create the plan",
     );
@@ -346,9 +335,8 @@ fn create_plan_prefunded_pda() {
     world.md().check("the plan is Active", PlanStatus::Active as u8, status);
 }
 
-#[test]
-fn create_plan_duplicate_plan_id() {
-    let mut world = World::new(make_backend(), "Reject a duplicate plan id", "re-creating a plan with an existing id is rejected");
+pub fn create_plan_duplicate_plan_id<B: TestSVM>(backend: B) {
+    let mut world = World::new(backend, "Reject a duplicate plan id", "re-creating a plan with an existing id is rejected");
     let merchant = world.actor("merchant");
 
     let mint = init_mint(world.svm_mut(), TOKEN_PROGRAM_ID, MINT_DECIMALS, 1_000_000_000, None, &[]);

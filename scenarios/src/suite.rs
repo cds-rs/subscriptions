@@ -7,4 +7,11 @@
 //! receiving the backend as a parameter instead of naming a concrete engine, and
 //! gating fee-dependent assertions on [`crate::tests::utils::World::capabilities`].
 
+pub mod close_subscription_authority;
+pub mod create_plan;
+pub mod delete_plan;
+pub mod initialize_subscription_authority;
+pub mod resume_subscription;
+pub mod revoke_subscription_authority;
 pub mod subscribe;
+pub mod update_plan;
