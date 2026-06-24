@@ -1,6 +1,6 @@
 //! `transfer_subscription`, bound to the quasar-svm engine.
 //!
-//! The bodies live in `scenarios::suite::test_transfer_subscription`
+//! The bodies live in `scenarios::suite::transfer_subscription`
 //! (engine-neutral, generic over `B: TestSVM`); this is the quasar binding, the
 //! analogue of the litesvm `test_transfer_subscription_bound.rs`.
 //! `bind_scenarios!` emits one `#[test]` per scenario, each calling the generic
@@ -10,7 +10,7 @@ use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;
-    test_transfer_subscription;
+    transfer_subscription;
     test_transfer_subscription_success,
     test_transfer_subscription_puller_authorized,
     test_transfer_subscription_unauthorized_caller,

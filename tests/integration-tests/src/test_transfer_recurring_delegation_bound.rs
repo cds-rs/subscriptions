@@ -1,6 +1,6 @@
 //! `transfer_recurring_delegation`, bound to the litesvm engine.
 //!
-//! The bodies live in `scenarios::suite::test_transfer_recurring_delegation`
+//! The bodies live in `scenarios::suite::transfer_recurring_delegation`
 //! (engine-neutral, generic over `B: TestSVM`). This module is the litesvm
 //! binding: `bind_scenarios!` emits one `#[test]` per scenario, each calling the
 //! generic body with a fresh `make_backend()`. The rendered reports are
@@ -8,7 +8,7 @@
 
 scenarios::bind_scenarios!(
     crate::tests::utils::make_backend;
-    test_transfer_recurring_delegation;
+    transfer_recurring_delegation;
     test_recurring_transfer_success,
     test_recurring_transfer_exceeds_period_limit,
     test_recurring_transfer_expired,

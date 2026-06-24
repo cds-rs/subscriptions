@@ -1,6 +1,6 @@
 //! `transfer_fixed_delegation`, bound to the litesvm engine.
 //!
-//! The bodies live in `scenarios::suite::test_transfer_fixed_delegation`
+//! The bodies live in `scenarios::suite::transfer_fixed_delegation`
 //! (engine-neutral, generic over `B: TestSVM`). This module is the litesvm
 //! binding: `bind_scenarios!` emits one `#[test]` per scenario, each calling the
 //! generic body with a fresh `make_backend()`. The rendered reports are
@@ -8,7 +8,7 @@
 
 scenarios::bind_scenarios!(
     crate::tests::utils::make_backend;
-    test_transfer_fixed_delegation;
+    transfer_fixed_delegation;
     test_fixed_transfer_success,
     test_fixed_transfer_token_2022_transfer_fee,
     test_fixed_transfer_token_2022_confidential_transfer_public_balance,

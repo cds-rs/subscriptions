@@ -12,7 +12,7 @@
 //! the `Unauthorized` error.
 //!
 //! The point is not another assertion on `transfer_subscription` (the
-//! `test_transfer_subscription` suite covers the behavior exhaustively); it is to
+//! `transfer_subscription` suite covers the behavior exhaustively); it is to
 //! show that the diagram a human drew to *explain* the instruction falls out of
 //! the executor for free, frame by frame, when we run the instruction both ways.
 

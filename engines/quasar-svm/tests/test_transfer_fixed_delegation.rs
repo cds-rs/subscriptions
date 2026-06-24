@@ -1,6 +1,6 @@
 //! `transfer_fixed_delegation`, bound to the quasar-svm engine.
 //!
-//! The bodies live in `scenarios::suite::test_transfer_fixed_delegation`
+//! The bodies live in `scenarios::suite::transfer_fixed_delegation`
 //! (engine-neutral, generic over `B: TestSVM`); this is the quasar binding, the
 //! analogue of the litesvm `test_transfer_fixed_delegation_bound.rs`.
 //! `bind_scenarios!` emits one `#[test]` per scenario, each calling the generic
@@ -10,7 +10,7 @@ use subscriptions_quasar_svm::make_quasar_backend;
 
 scenarios::bind_scenarios!(
     make_quasar_backend;
-    test_transfer_fixed_delegation;
+    transfer_fixed_delegation;
     test_fixed_transfer_success,
     test_fixed_transfer_token_2022_transfer_fee,
     test_fixed_transfer_token_2022_confidential_transfer_public_balance,

@@ -1,6 +1,6 @@
 //! `transfer_subscription`, bound to the litesvm engine.
 //!
-//! The bodies live in `scenarios::suite::test_transfer_subscription`
+//! The bodies live in `scenarios::suite::transfer_subscription`
 //! (engine-neutral, generic over `B: TestSVM`). This module is the litesvm
 //! binding: `bind_scenarios!` emits one `#[test]` per scenario, each calling the
 //! generic body with a fresh `make_backend()`. The rendered reports are
@@ -8,7 +8,7 @@
 
 scenarios::bind_scenarios!(
     crate::tests::utils::make_backend;
-    test_transfer_subscription;
+    transfer_subscription;
     test_transfer_subscription_success,
     test_transfer_subscription_puller_authorized,
     test_transfer_subscription_unauthorized_caller,
