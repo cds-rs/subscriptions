@@ -13,7 +13,47 @@ Scope: this is the **engine axis**, not a program rewrite. The program binary
 is byte-identical on both engines; only the backend differs. There is no
 "quasar version" of the program here, just the same `.so` under a second engine.
 
-Measurements only. No interpretation.
+## What a fingerprint is, and what this compares
+
+Strictly, a fingerprint is a Merkle hash of a transaction's *normalized*
+behavioral signature: take the structured record of what the transaction did,
+normalize it (resolve addresses to the roles that derived them, decide which
+fields count), and hash. The result is a scalar that answers one question, are two
+executions the same under this notion of identity, and nothing else.
+
+This analysis works one step before the hash, on the rendered record itself: the
+human-readable surface the fingerprint would be computed from. That record is the
+structured CPI tree (every program invoked, nested, each with its compute), a
+sequence diagram, an authority graph (who signed what), an ownership graph (what
+owns what once the transaction settles), the decoded events with their fields, and
+the transaction's fee and total compute. The actors are deterministic and the clock
+is pinned, so a given scenario renders the same bytes on every run of one engine; a
+difference between two records is a difference between two executions, not harness
+noise.
+
+Comparing the records directly, rather than their fingerprints, is deliberate, and
+it is the stricter test. A fingerprint normalizes before it hashes, so it folds away
+whatever a normalization chooses to ignore (an unaliased address that differs only
+because a counter is not in lockstep across two runs). The record folds away
+nothing. That is why 0 of 225 match, and it is the right place to start: you cannot
+decide what a fingerprint should normalize until you have seen, un-normalized,
+everything that actually differs.
+
+## How the comparison focuses attention
+
+Two records of the same scenario, diffed line by line, localize every place the two
+executions disagree: a differing line is a differing field. One diff is a curiosity.
+The leverage comes from doing it across all 225 scenarios and tallying which fields
+differ, which turns a wall of diffs into a ranking. A field that differs in nearly
+every scenario is a systematic difference between the engines; a field that differs
+in a handful is incidental to particular tests. The systematic ones are where to
+look first, because they are a property of the engine pair rather than of any one
+scenario. The table below is that ranking, and it is the input a fingerprint's
+design needs: a difference that is incidental and noisy is a candidate to normalize
+away; one that is systematic and meaningful is a field to keep.
+
+What follows is measurements: what differs, and how widely. No interpretation of the
+causes; sorting each difference into its bucket is the task at the end.
 
 ## Result
 
