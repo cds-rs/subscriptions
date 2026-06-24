@@ -1,12 +1,33 @@
 # Same program, two engines: a fingerprint comparison
 
-`subscriptions` is a new pinocchio protocol from the Solana Foundation.
-Experimentally, and not verified for correctness (I am prioritizing the system
-design to get to the ballpark): I converted its test suite to our observability
-framework for richer execution data, parametrized the framework over the
-execution backend, ran the **same program** on two engines (litesvm and
-quasar-svm), and compared the rendered results. They look both equivalent and
-not. Deeper analysis after the capstone.
+> **Disclaimer.** `Subscriptions` is an audited Solana Foundation protocol, and is
+> treated here as correct: it is a fixture, not the subject. The subject under test
+> is an experimental testing framework of my own, which is unverified and may be
+> wrong. Every difference reported below is therefore a question about that framework
+> or the engines beneath it, not a defect in Subscriptions. Nothing in this document
+> is a claim about the protocol's correctness.
+
+## What is and is not under test
+
+`Subscriptions` is a new, audited pinocchio protocol from the Solana Foundation. In
+this experiment it is a fixture, not the subject. I treat it as correct (it has been
+audited) and use it as a known-good program to exercise something else.
+
+The subject under test is my own work, the part that might be wrong: an experimental
+observability and testing framework, and the layer that lets one test suite run on
+more than one execution engine. Subscriptions's behavior is the constant here; my
+framework's rendering of that behavior is the variable. So when two reports of the
+same transaction disagree, the discrepancy is a fact about my framework or the
+engines beneath it, never about the protocol. Nothing in this document speaks to
+whether Subscriptions is correct; by assumption, it is.
+
+This is experimental and not verified for correctness; I am prioritizing the system
+design to get to the ballpark, and the careful analysis comes after my capstone.
+
+What I did: converted Subscriptions's test suite to the observability framework (for
+richer execution data), parametrized the framework over the execution backend, ran
+the **same program** on two engines (litesvm and quasar-svm), and compared the
+rendered results. They look both equivalent and not.
 
 Scope: this is the **engine axis**, not a program rewrite. The program binary
 (`target/deploy/subscriptions_program.so`, built once from the pinocchio source)
@@ -117,7 +138,9 @@ not match. The differences above are measured. They are not yet explained.
 
 ## Hypothesis
 
-Lossy execution fidelity between the two engines. To be investigated.
+Lossy execution fidelity: my framework, projecting one (correct) execution through
+two engines, renders and meters it two different ways. The loss is mine to find, in
+the framework or the engine adapters, not in the protocol. To be investigated.
 
 ## Task: explain each measured difference
 
